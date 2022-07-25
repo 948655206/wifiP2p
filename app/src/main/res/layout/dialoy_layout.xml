@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center"
+    >
+
+    <TextView
+        android:layout_marginLeft="10dp"
+        android:id="@+id/up_tv"
+        android:layout_width="0dp"
+        android:layout_weight="3.5"
+        android:layout_height="wrap_content"
+        android:textColor="@color/black"
+        android:text="正在上传.....\n 请勿退出!!!"
+        android:textSize="40dp"
+        />
+    <ProgressBar
+        android:layout_marginLeft="10dp"
+        android:layout_marginRight="10dp"
+        android:layout_width="0dp"
+        android:layout_height="110dp"
+        android:layout_weight="2"
+        />
+
+</LinearLayout>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DesignSurface">
+    <option name="filePathToZoomLevelMap">
+      <map>
+        <entry key="..\:/CheckDatabase/app/src/main/res/drawable/ic_launcher_background.xml" value="0.18" />
+        <entry key="..\:/CheckDatabase/app/src/main/res/layout/activity_main.xml" value="0.25" />
+        <entry key="..\:/CheckDatabase/app/src/main/res/layout/activity_receiver.xml" value="0.16983695652173914" />
+        <entry key="..\:/CheckDatabase/app/src/main/res/layout/activity_sender.xml" value="0.36614583333333334" />
+        <entry key="..\:/CheckDatabase/app/src/main/res/layout/dialoy_layout.xml" value="0.1875" />
+        <entry key="..\:/CheckDatabase/app/src/main/res/layout/listview_layout.xml" value="0.17255434782608695" />
+        <entry key="..\:/CheckDatabase/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" value="0.1955" />
+      </map>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_11" default="true" project-jdk-name="Android Studio default JDK" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/build/classes" />
+  </component>
+  <component name="ProjectType">
+    <option name="id" value="Android" />
+  </component>
+</project>
