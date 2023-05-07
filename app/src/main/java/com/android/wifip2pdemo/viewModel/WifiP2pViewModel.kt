@@ -27,11 +27,15 @@ class WifiP2pViewModel : ViewModel() {
     private val _peerList = MutableLiveData<List<WifiP2pDevice>>()
     val peerList = _peerList
 
+    private val _isConnected = MutableLiveData(false)
+    val isConnected = _isConnected
+
     var manager: WifiP2pManager? = null
     var mChannel: WifiP2pManager.Channel? = null
 
     var owner: Int = 0
     val port: Int = 6666
+
 
     fun setState(state: WifiState) {
         _wifiState.postValue(state)
@@ -56,21 +60,6 @@ class WifiP2pViewModel : ViewModel() {
         manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 LogUtils.i("连接成功....")
-//                sendMessage(device.deviceAddress)
-                manager?.requestConnectionInfo(mChannel) { info ->
-                    val address = info.groupOwnerAddress
-                    val groupOwner = info.isGroupOwner
-                    val groupFormed = info.groupFormed
-                    println("是否形成==>${groupFormed}")
-                    println("连接信息==>${groupOwner}")
-                    println("连接信息==>${address}")
-
-                    if (address != null) {
-                        LogUtils.i("连接信息==>${address.hostAddress}")
-                        sendMessage(address.hostAddress)
-                    }
-                }
-
             }
 
             override fun onFailure(p0: Int) {
@@ -109,39 +98,56 @@ class WifiP2pViewModel : ViewModel() {
     }
 
     private fun createGroup() {
-        val config = WifiP2pConfig()
         manager?.apply {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                createGroup(mChannel, object : WifiP2pManager.ActionListener {
-                    override fun onSuccess() {
-                        LogUtils.i("创建组成功...${mDevice?.deviceName}")
-                        requestGroupInfo(mChannel
-                        ) {group->
-                            val address = group.owner.deviceAddress
-                            LogUtils.i("本机IP==>$address")
-                        }
-                    }
+            createGroup(mChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    LogUtils.i("创建组成功...")
+                    receiveMessage()
+//                        requestGroupInfo(mChannel
+//                        ) {group->
+//                            if (group != null) {
+//                                val address = group.owner.deviceAddress
+//                                LogUtils.i("本机IP==>$address")
+//                            }else{
+//                                println("goup为空...")
+//                            }
+//
+//                        }
+                }
 
-                    override fun onFailure(p0: Int) {
-                        LogUtils.i("创建组失败...$p0")
-                    }
+                override fun onFailure(p0: Int) {
+                    LogUtils.i("创建组失败...$p0")
+                }
 
-                })
-            }
+            })
         }
     }
 
-    //发送信息
-    fun sendMessage(socketAddress: String?) {
+    private var socket: Socket? = null
+    val message = "zxy 666\n"
+
+    fun connectSocket(socketAddress: String?) {
         viewModelScope.launch(Dispatchers.IO) {
-            LogUtils.i("开始发送信息...$socketAddress")
+            socket = Socket(socketAddress, port)
+            LogUtils.i("建立socket连接...$socketAddress")
+        }
+
+
+    }
+
+    //发送信息
+    fun sendMessage() {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (socket != null) {
+                LogUtils.i("socket不为空...")
+            } else {
+                LogUtils.e("socket为空...")
+            }
             try {
-                val message = "zxy 666"
-                val socket = Socket()
-                socket.connect(InetSocketAddress(socketAddress, port))
-                val outputStream = socket.getOutputStream()
-                outputStream.write(message.toByteArray())
-                outputStream.flush()
+                LogUtils.i("开始发送信息....")
+                val outputStream = socket?.getOutputStream()
+                outputStream?.write(message.toByteArray(), 0, message.toByteArray().size)
+                outputStream?.flush()
 
                 //记得关闭连接
             } catch (e: Exception) {
@@ -153,6 +159,7 @@ class WifiP2pViewModel : ViewModel() {
 
     fun receiveMessage() {
         LogUtils.i("开始接收信息...")
+        val byteArray = ByteArray(1024)
         try {
             val serverSocket = ServerSocket(port)
             viewModelScope.launch(Dispatchers.IO) {
@@ -161,17 +168,26 @@ class WifiP2pViewModel : ViewModel() {
                     val socket = serverSocket.accept()
 
                     viewModelScope.launch(Dispatchers.IO) {
-
-                        val inputStream = socket.getInputStream()
-                        val reader = BufferedReader(InputStreamReader(inputStream))
-                        val stringBuilder = StringBuilder()
-                        var line: String?
-                        while (reader.readLine().also { line = it } != null) {
-                            stringBuilder.append(line)
+                        while (true){
+                            val inputStream = socket.getInputStream()
+                            val size = inputStream.read(byteArray)
+                            if (size>0){
+                                val string =
+                                    byteArray.sliceArray(0 until size).toString(Charsets.UTF_8)
+                                LogUtils.i("收到的信息...$string")
+                            }
                         }
-                        val message = stringBuilder.toString()
+//                        val inputStream = socket.getInputStream()
+//                        LogUtils.i("收到信息了...")
+//                        val reader = BufferedReader(InputStreamReader(inputStream))
+//                        LogUtils.i("收到信息了...123")
+//                        val stringBuilder = StringBuilder()
+//                        var line: String?
+//                        while (reader.readLine().also { line = it } != null) {
+//                            stringBuilder.append(line)
+//                        }
+//                        val message = stringBuilder.toString()
 
-                        LogUtils.i("收到的信息...$message")
                     }
 
                 }
@@ -181,6 +197,42 @@ class WifiP2pViewModel : ViewModel() {
             LogUtils.e("接收信息出错。。。${e.toString()}")
         }
 
+    }
+
+    fun removeGroup() {
+        manager?.apply {
+            requestGroupInfo(mChannel) { group ->
+                if (group != null) {
+                    removeGroup(mChannel, object : WifiP2pManager.ActionListener {
+                        override fun onSuccess() {
+                            LogUtils.i("移除组成功....")
+                        }
+
+                        override fun onFailure(p0: Int) {
+                            LogUtils.i("移除组失败....$p0")
+                        }
+
+                    })
+                }
+            }
+        }
+    }
+
+    fun disconnect() {
+        manager?.cancelConnect(mChannel, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+                LogUtils.i("断开连接成功...")
+            }
+
+            override fun onFailure(p0: Int) {
+                LogUtils.e("断开连接失败...$p0")
+            }
+
+        })
+    }
+
+    fun setConnectState(state: Boolean) {
+        isConnected.postValue(state)
     }
 }
 

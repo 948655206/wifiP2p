@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
 import com.blankj.utilcode.util.LogUtils
 import java.io.BufferedReader
@@ -135,7 +136,23 @@ object Screen {
                     items(listState) { device ->
                         TextButton(
                             onClick = {
-                                viewModel.connectPeers(device)
+                                when (viewModel.chooseState.value) {
+                                    ChooseState.HOME_FRAGMENT -> {
+
+                                    }
+                                    ChooseState.SENDER_FRAGMENT -> {
+                                        if (viewModel.isConnected.value == true){
+
+                                            viewModel.sendMessage()
+                                        }else{
+                                            viewModel.connectPeers(device)
+                                        }
+                                    }
+                                    ChooseState.RECEIVER_FRAGMENT -> {
+
+                                    }
+                                    else -> {}
+                                }
                             }, modifier = Modifier
                                 .padding(5.dp)
                                 .fillMaxWidth()

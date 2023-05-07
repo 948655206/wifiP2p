@@ -84,23 +84,6 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         }
 
     }
-
-    override fun onResume() {
-        super.onResume()
-        LogUtils.v("显示页面...")
-        intentFilter?.let {
-            registerReceiver(receiver, intentFilter)
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        LogUtils.i("看不见了...")
-        receiver.also {
-            unregisterReceiver(receiver)
-        }
-    }
-
     @SuppressLint("NewApi")
     @Composable
     fun showTitle() {
@@ -118,7 +101,6 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             ChooseState.RECEIVER_FRAGMENT -> {
                 LogUtils.i("RECEIVER_FRAGMENT")
                 viewModel.createNewGroup()
-                viewModel.receiveMessage()
             }
             null -> {}
         }
@@ -168,12 +150,20 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         return packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)
     }
 
-
+    override fun onResume() {
+        super.onResume()
+        registerReceiver(receiver, intentFilter)
+    }
     @Composable
     override fun setView() {
         showTitle()
     }
 
+    override fun onStop() {
+        super.onStop()
+        viewModel.removeGroup()
+        unregisterReceiver(receiver)
+    }
     override fun onDestroy() {
         super.onDestroy()
 

@@ -8,6 +8,7 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import androidx.annotation.RequiresApi
+import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
 import com.android.wifip2pdemo.viewModel.WifiState
 import com.blankj.utilcode.util.LogUtils
@@ -55,13 +56,6 @@ class WiFiDirectBroadcastReceiver(
                     requestPeers(channel) { peers ->
                         viewModel.addPeer(peers.deviceList.toList())
                     }
-                    requestConnectionInfo(channel) { info ->
-                        val address = info.groupOwnerAddress
-                        LogUtils.i("成功监听到...${info.isGroupOwner}")
-                        if (address != null) {
-                        }
-
-                    }
                 }
 
             }
@@ -69,31 +63,40 @@ class WiFiDirectBroadcastReceiver(
                 // Respond to new connection or disconnections
                 viewModel.setState(WifiState.WIFI_P2P_CONNECTION_CHANGED_ACTION)
                 LogUtils.i("连接状态改变...")
+                val networkInfo = intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO) as NetworkInfo?
+
+                if (networkInfo != null) {
+                    viewModel.setConnectState(networkInfo.isConnected)
+                }
+
                 manager?.requestConnectionInfo(channel) { info ->
                     val address = info.groupOwnerAddress
                     val groupOwner = info.isGroupOwner
-                    println("连接信息==>${groupOwner}")
+                    val formed = info.groupFormed
+                    println("是否形成组==>$formed")
+                    println("是否为组长==>${groupOwner}")
                     println("连接信息==>${address}")
-                    if (address != null) {
-                        println("连接信息==>${address.hostAddress}")
+                    if (!groupOwner && formed) {
+                        val host = address.hostAddress
+                        viewModel.connectSocket(host)
                     }
                 }
             }
             WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
                 // Respond to this device's wifi state changing
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    manager.requestDeviceInfo(
-                        channel
-                    ) { device ->
-                        LogUtils.i("本机状态改变..."+device?.isGroupOwner)
-                        viewModel.mDevice = device
-                    }
-                } else {
-                    val device =
-                        intent.getParcelableExtra<WifiP2pDevice>(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE)
-                    LogUtils.i("本机状态改变..."+device?.isGroupOwner)
-                    viewModel.mDevice = device
-                }
+//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//                    manager.requestDeviceInfo(
+//                        channel
+//                    ) { device ->
+//                        LogUtils.i("本机状态改变..."+device?.isGroupOwner)
+//                        viewModel.mDevice = device
+//                    }
+//                } else {
+//                    val device =
+//                        intent.getParcelableExtra<WifiP2pDevice>(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE)
+//                    LogUtils.i("本机状态改变..."+device?.isGroupOwner)
+//                    viewModel.mDevice = device
+//                }
 
             }
             else -> {
