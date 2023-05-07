@@ -11,6 +11,8 @@ import com.blankj.utilcode.util.ToastUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -148,7 +150,6 @@ class WifiP2pViewModel : ViewModel() {
                 val outputStream = socket?.getOutputStream()
                 outputStream?.write(message.toByteArray(), 0, message.toByteArray().size)
                 outputStream?.flush()
-
                 //记得关闭连接
             } catch (e: Exception) {
                 LogUtils.e("发送信息出错了...$e")
@@ -168,25 +169,22 @@ class WifiP2pViewModel : ViewModel() {
                     val socket = serverSocket.accept()
 
                     viewModelScope.launch(Dispatchers.IO) {
-                        while (true){
-                            val inputStream = socket.getInputStream()
-                            val size = inputStream.read(byteArray)
-                            if (size>0){
-                                val string =
-                                    byteArray.sliceArray(0 until size).toString(Charsets.UTF_8)
-                                LogUtils.i("收到的信息...$string")
-                            }
-                        }
-//                        val inputStream = socket.getInputStream()
-//                        LogUtils.i("收到信息了...")
-//                        val reader = BufferedReader(InputStreamReader(inputStream))
-//                        LogUtils.i("收到信息了...123")
-//                        val stringBuilder = StringBuilder()
-//                        var line: String?
-//                        while (reader.readLine().also { line = it } != null) {
-//                            stringBuilder.append(line)
+//                        while (true){
+//                            val inputStream = socket.getInputStream()
+//                            val size = inputStream.read(byteArray)
+//                            if (size>0){
+//                                val string =
+//                                    byteArray.sliceArray(0 until size).toString(Charsets.UTF_8)
+//                                LogUtils.i("收到的信息...$string")
+//                            }
 //                        }
-//                        val message = stringBuilder.toString()
+
+                        while (true) {
+                            val inputStream = socket.getInputStream()
+                            val bufferedReader = BufferedReader(InputStreamReader(inputStream))
+                            val string = bufferedReader.readLine()
+                            LogUtils.i("收到的信息...$string")
+                        }
 
                     }
 

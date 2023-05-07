@@ -84,19 +84,7 @@ class WiFiDirectBroadcastReceiver(
             }
             WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
                 // Respond to this device's wifi state changing
-//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//                    manager.requestDeviceInfo(
-//                        channel
-//                    ) { device ->
-//                        LogUtils.i("本机状态改变..."+device?.isGroupOwner)
-//                        viewModel.mDevice = device
-//                    }
-//                } else {
-//                    val device =
-//                        intent.getParcelableExtra<WifiP2pDevice>(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE)
-//                    LogUtils.i("本机状态改变..."+device?.isGroupOwner)
-//                    viewModel.mDevice = device
-//                }
+
 
             }
             else -> {
