@@ -1,0 +1,16 @@
+//指定Protobuf 版本
+syntax = "proto3";
+package fileConfig;
+
+message Config{
+    bytes content=1;
+
+    enum Type{
+        FILE =0;
+        IMAGE =1;
+        TEXT =2;
+    }
+    Type type=2;
+
+
+}

@@ -6,9 +6,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,19 +18,14 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
-import com.blankj.utilcode.util.LogUtils
-import java.io.BufferedReader
-import java.io.IOException
-import java.io.InputStreamReader
 
 @Suppress("TODO")
 @OptIn(ExperimentalMaterial3Api::class)
 object Screen {
     const val HOME_FRAGMENT = "HOME"
-    const val P2P_FRAGMENT = "p2p"
-
     const val SENDER_FRAGMENT = "SENDER"
     const val RECEIVER_FRAGMENT = "RECEIVER"
+    const val MESSAGE_FRAGMENT = "MESSAGE"
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @Composable
@@ -46,6 +42,7 @@ object Screen {
                 ) {
                     TextButton(onClick = {
                         navController.navigate(RECEIVER_FRAGMENT)
+
                     }) {
                         Text(text = "接收端")
                     }
@@ -99,7 +96,7 @@ object Screen {
     private fun setTopBar(
         title: String,
 //        back: NavHostController?=null,
-        back: (() -> Boolean?)? = null,
+        back: (() -> Any?)? = null,
     ) {
         TopAppBar(
             title = { Text(text = title) },
@@ -107,7 +104,6 @@ object Screen {
                 back?.let {
                     IconButton(onClick = {
                         back.invoke()
-                        println("点击了返回按钮...")
                     }) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
@@ -133,26 +129,39 @@ object Screen {
             horizontalAlignment = Alignment.CenterHorizontally,
             content = {
                 listState?.let {
+                    if (viewModel.chooseState.value == ChooseState.SENDER_FRAGMENT) {
+                        item {
+                            var text by remember {
+                                mutableStateOf("")
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                TextField(value = text,
+                                    onValueChange = { text = it },
+                                    label = {
+                                        Text(text = "请在此输入内容")
+                                    })
+                                IconButton(onClick = {
+                                    viewModel.socketSendMessage(text)
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = null
+                                    )
+                                }
+                            }
+
+                        }
+                    }
                     items(listState) { device ->
+
                         TextButton(
                             onClick = {
-                                when (viewModel.chooseState.value) {
-                                    ChooseState.HOME_FRAGMENT -> {
-
-                                    }
-                                    ChooseState.SENDER_FRAGMENT -> {
-                                        if (viewModel.isConnected.value == true){
-
-                                            viewModel.sendMessage()
-                                        }else{
-                                            viewModel.connectPeers(device)
-                                        }
-                                    }
-                                    ChooseState.RECEIVER_FRAGMENT -> {
-
-                                    }
-                                    else -> {}
-                                }
+                                viewModel.connectPeers(device)
+                                viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
                             }, modifier = Modifier
                                 .padding(5.dp)
                                 .fillMaxWidth()
@@ -167,25 +176,35 @@ object Screen {
         )
     }
 
-    private fun getDeviceIpAddress(deviceAddress: String): String {
-        // 通过设备的MAC地址获取IP地址
-        val cmd = "ping -c 1 -w 1 $deviceAddress"
-        val runtime = Runtime.getRuntime()
-        try {
-            val process = runtime.exec(cmd)
-            val input = BufferedReader(InputStreamReader(process.inputStream))
-            var line = input.readLine()
-            while (line != null) {
-                if (line.contains("PING")) {
-                    val start = line.indexOf('(')
-                    val end = line.indexOf(')')
-                    return line.substring(start + 1, end)
-                }
-                line = input.readLine()
+    @Composable
+    fun messageFragment(
+        navController: NavHostController,
+        viewModel: WifiP2pViewModel,
+        send: () -> Unit
+    ) {
+        Scaffold(
+            topBar = {
+                setTopBar(title = "文件传输页", back = {
+                    navController.navigateUp()
+                    viewModel.disconnect()
+                })
             }
-        } catch (e: IOException) {
-            e.printStackTrace()
+        ) {
+            Column(
+                modifier = Modifier.padding(it),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                IconButton(
+                    onClick = {
+                        send.invoke()
+                    },
+                ) {
+                    Icon(imageVector = Icons.Default.Info, null)
+                }
+            }
+
         }
-        return ""
     }
+
 }

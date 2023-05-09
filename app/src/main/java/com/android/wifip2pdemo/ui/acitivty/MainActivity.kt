@@ -4,10 +4,12 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
+import android.provider.MediaStore
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -18,6 +20,7 @@ import com.android.wifip2pdemo.broadCast.WiFiDirectBroadcastReceiver
 import com.android.wifip2pdemo.ui.acitivty.base.BaseVMActivity
 import com.android.wifip2pdemo.ui.compose.Screen
 import com.android.wifip2pdemo.ui.compose.Screen.HOME_FRAGMENT
+import com.android.wifip2pdemo.ui.compose.Screen.MESSAGE_FRAGMENT
 import com.android.wifip2pdemo.ui.compose.Screen.RECEIVER_FRAGMENT
 import com.android.wifip2pdemo.ui.compose.Screen.SENDER_FRAGMENT
 import com.android.wifip2pdemo.viewModel.ChooseState
@@ -69,11 +72,15 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         }
 
         intentFilter = IntentFilter().apply {
+            //设备状态变化
             addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
+            //附近设备变化
             addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
             //搜索状态
             addAction(WifiP2pManager.WIFI_P2P_DISCOVERY_CHANGED_ACTION)
+            //连接状态
             addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+            //本设备操作变更
             addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                 addAction(WifiP2pManager.WIFI_P2P_DISCOVERY_CHANGED_ACTION)
@@ -83,51 +90,70 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             }
         }
 
+        viewModel.connectState.observe(
+            this
+        ) { value ->
+            when (value) {
+                WifiP2pViewModel.ConnectState.FIRST_TIME -> {
+                    ToastUtils.showShort("欢迎使用...")
+                }
+
+                WifiP2pViewModel.ConnectState.CONNECT_LOADING -> {
+                    ToastUtils.showShort("连接中...")
+                }
+                WifiP2pViewModel.ConnectState.CONNECT_SUCCESS -> {
+                    ToastUtils.showShort("连接成功...")
+                }
+                WifiP2pViewModel.ConnectState.CONNECT_DISCONNECT -> {
+                    ToastUtils.showShort("连接已断开...")
+                }
+                WifiP2pViewModel.ConnectState.CONNECT_CREATER -> {
+                    ToastUtils.showShort("等待发送端连接...")
+
+                }
+            }
+        }
     }
+
+
     @SuppressLint("NewApi")
     @Composable
     fun showTitle() {
-        val navController = rememberNavController()
 
         val chooseState by viewModel.chooseState.observeAsState()
+        val navController = rememberNavController()
+
         when (chooseState) {
             ChooseState.HOME_FRAGMENT -> {
                 LogUtils.i("HOME_FRAGMENT")
+                viewModel.disconnect()
+
             }
             ChooseState.SENDER_FRAGMENT -> {
                 LogUtils.i("SENDER_FRAGMENT")
-
+                manager.discoverPeers(mChannel, null)
             }
             ChooseState.RECEIVER_FRAGMENT -> {
                 LogUtils.i("RECEIVER_FRAGMENT")
                 viewModel.createNewGroup()
             }
-            null -> {}
+            ChooseState.MESSAGE_FRAGMENT -> {
+                navController.navigate(MESSAGE_FRAGMENT)
+            }
+            else -> {
+                LogUtils.i("else123123123")
+            }
         }
         NavHost(navController = navController, startDestination = HOME_FRAGMENT) {
             composable(HOME_FRAGMENT) {
-//                manager.apply {
-//                    stopPeerDiscovery(mChannel,null)
-//
-//                    cancelConnect(mChannel,object :WifiP2pManager.ActionListener{
-//                        override fun onSuccess() {
-//                            println("断开连接成功....")
-//                        }
-//
-//                        override fun onFailure(p0: Int) {
-//                            println("断开连接失败....$p0")
-//                        }
-//                    })
-//                }
                 Screen.homeFragment(
-                    navController
+                    navController,
                 )
-                viewModel.chooseState.postValue(ChooseState.SENDER_FRAGMENT)
+                viewModel.chooseState.postValue(ChooseState.HOME_FRAGMENT)
 
             }
 
             composable(SENDER_FRAGMENT) {
-                manager?.discoverPeers(mChannel, null)
                 Screen.senderFragment(
                     navController,
                     viewModel
@@ -143,6 +169,31 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                 //解决compose 重复两次的BUG
                 viewModel.chooseState.postValue(ChooseState.RECEIVER_FRAGMENT)
             }
+
+            composable(MESSAGE_FRAGMENT) {
+                Screen.messageFragment(
+                    navController,
+                    viewModel
+                ) {
+                    LogUtils.i("打开相册...")
+                    val intentPick =
+                        Intent(Intent.ACTION_GET_CONTENT)
+                    intentPick.type="application/zip"
+                    startActivityForResult(intentPick, 666)
+                }
+                viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 666 && resultCode == RESULT_OK) {
+            val uri = data?.data!!
+
+            //测试速率
+            viewModel.sendFile(uri)
+
         }
     }
 
@@ -154,18 +205,15 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         super.onResume()
         registerReceiver(receiver, intentFilter)
     }
+
     @Composable
     override fun setView() {
         showTitle()
     }
 
-    override fun onStop() {
-        super.onStop()
-        viewModel.removeGroup()
-        unregisterReceiver(receiver)
-    }
     override fun onDestroy() {
         super.onDestroy()
-
+        viewModel.disconnect()
+        unregisterReceiver(receiver)
     }
 }

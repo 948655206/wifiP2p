@@ -10,6 +10,8 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
+import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.CONNECT_CREATER
+import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.CONNECT_SUCCESS
 import com.android.wifip2pdemo.viewModel.WifiState
 import com.blankj.utilcode.util.LogUtils
 
@@ -63,22 +65,24 @@ class WiFiDirectBroadcastReceiver(
                 // Respond to new connection or disconnections
                 viewModel.setState(WifiState.WIFI_P2P_CONNECTION_CHANGED_ACTION)
                 LogUtils.i("连接状态改变...")
-                val networkInfo = intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO) as NetworkInfo?
-
-                if (networkInfo != null) {
-                    viewModel.setConnectState(networkInfo.isConnected)
-                }
 
                 manager?.requestConnectionInfo(channel) { info ->
                     val address = info.groupOwnerAddress
                     val groupOwner = info.isGroupOwner
                     val formed = info.groupFormed
+
+
                     println("是否形成组==>$formed")
                     println("是否为组长==>${groupOwner}")
                     println("连接信息==>${address}")
-                    if (!groupOwner && formed) {
-                        val host = address.hostAddress
-                        viewModel.connectSocket(host)
+
+                    if (groupOwner){
+                        //如果是组长
+                        viewModel.connectState.postValue(CONNECT_CREATER)
+                    }
+                    if (formed && !groupOwner){
+                        //如果是组长
+                        viewModel.connectState.postValue(CONNECT_SUCCESS)
                     }
                 }
             }
