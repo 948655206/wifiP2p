@@ -66,7 +66,7 @@ class WiFiDirectBroadcastReceiver(
                 viewModel.setState(WifiState.WIFI_P2P_CONNECTION_CHANGED_ACTION)
                 LogUtils.i("连接状态改变...")
 
-                manager?.requestConnectionInfo(channel) { info ->
+                manager.requestConnectionInfo(channel) { info ->
                     val address = info.groupOwnerAddress
                     val groupOwner = info.isGroupOwner
                     val formed = info.groupFormed

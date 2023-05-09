@@ -80,8 +80,9 @@ class WifiP2pViewModel(
         LogUtils.i("连接地址==>${config.deviceAddress}")
         manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
-                LogUtils.i("连接成功....${device.deviceName}")
+                LogUtils.i("连接中....${device.deviceName}")
                 _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+                connectState.postValue(CONNECT_LOADING)
             }
 
             override fun onFailure(p0: Int) {
@@ -166,15 +167,15 @@ class WifiP2pViewModel(
         LogUtils.i("开始接收图片...")
         val byteArray = ByteArray(1024)
         try {
+            val sockList= mutableListOf<Socket>()
             server = ServerSocket(port)
             viewModelScope.launch(Dispatchers.IO) {
                 while (true) {
                     LogUtils.i("阻塞中...")
                     try {
                         val socket = server.accept()
-
+                        sockList.add(socket)
                         viewModelScope.launch(Dispatchers.IO) {
-
                             var startTime = System.currentTimeMillis()
                             var totalRead = 0
 
@@ -184,8 +185,9 @@ class WifiP2pViewModel(
                             var totalByte = 0
                             //创建文件夹
                             val file =
-                                File(context.getExternalFilesDir(null), "$packageName/zxy.zip")
+                                File(context.getExternalFilesDir(null), "$packageName/zxy.jpg")
                             file.parentFile?.mkdir()
+                            LogUtils.i("路径为==>${file.absoluteFile}")
 
                             val fileOutputStream = FileOutputStream(file)
 
@@ -208,10 +210,13 @@ class WifiP2pViewModel(
 
                             fileOutputStream.flush()
                             fileOutputStream.close()
-                            LogUtils.i("路径为==>${file.absoluteFile}")
                             LogUtils.i("接收完毕...大小为..${totalByte / (1024.0 * 1024.0)}")
 
                             socket.close()
+                            sockList.remove(socket)
+                            if (sockList.isEmpty()) {
+                                LogUtils.i("当前socket列表为空...")
+                            }
                             val simpleDateFormat =
                                 SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
                             val format = simpleDateFormat.format(Date(System.currentTimeMillis()))
@@ -364,7 +369,7 @@ class WifiP2pViewModel(
                         if (address != null) {
                             val socket = Socket(address, port)
                             val outputStream = socket.getOutputStream()
-                            val buffer = ByteArray(1024 * 10)
+                            val buffer = ByteArray(1024 )
                             var byteRead = 0
                             var totalBytes = 0
                             var totalReadSpeed = 0
@@ -419,7 +424,7 @@ class WifiP2pViewModel(
                             if (address != null) {
                                 val socket = Socket(address, port)
                                 val outputStream = socket.getOutputStream()
-                                val buffer = ByteArray(1024 * 10)
+                                val buffer = ByteArray(1024 )
                                 var byteRead = 0
                                 var totalBytes = 0
                                 var totalReadSpeed = 0

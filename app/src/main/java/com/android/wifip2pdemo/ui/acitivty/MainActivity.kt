@@ -180,6 +180,9 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                         Intent(Intent.ACTION_GET_CONTENT)
                     intentPick.type="application/zip"
                     startActivityForResult(intentPick, 666)
+//                    val intentPick =
+//                        Intent(Intent.ACTION_PICK,MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+//                    startActivityForResult(intentPick, 666)
                 }
                 viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
             }
@@ -193,7 +196,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
 
             //测试速率
             viewModel.sendFile(uri)
-
+//            viewModel.sendImage(uri)
         }
     }
 

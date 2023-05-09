@@ -129,33 +129,6 @@ object Screen {
             horizontalAlignment = Alignment.CenterHorizontally,
             content = {
                 listState?.let {
-                    if (viewModel.chooseState.value == ChooseState.SENDER_FRAGMENT) {
-                        item {
-                            var text by remember {
-                                mutableStateOf("")
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                TextField(value = text,
-                                    onValueChange = { text = it },
-                                    label = {
-                                        Text(text = "请在此输入内容")
-                                    })
-                                IconButton(onClick = {
-                                    viewModel.socketSendMessage(text)
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Send,
-                                        contentDescription = null
-                                    )
-                                }
-                            }
-
-                        }
-                    }
                     items(listState) { device ->
 
                         TextButton(
@@ -182,6 +155,8 @@ object Screen {
         viewModel: WifiP2pViewModel,
         send: () -> Unit
     ) {
+        val connectState by viewModel.connectState.observeAsState()
+
         Scaffold(
             topBar = {
                 setTopBar(title = "文件传输页", back = {
@@ -190,19 +165,33 @@ object Screen {
                 })
             }
         ) {
-            Column(
-                modifier = Modifier.padding(it),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                IconButton(
-                    onClick = {
-                        send.invoke()
-                    },
-                ) {
-                    Icon(imageVector = Icons.Default.Info, null)
+            when (connectState) {
+                WifiP2pViewModel.ConnectState.CONNECT_LOADING -> {
+                    Box(
+                        modifier = Modifier.padding(it).fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
+                else -> {
+                    Column(
+                        modifier = Modifier.padding(it),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        IconButton(
+                            onClick = {
+                                send.invoke()
+                            },
+                        ) {
+                            Icon(imageVector = Icons.Default.Info, null)
+                        }
+                    }
+                }
+
             }
+
 
         }
     }
