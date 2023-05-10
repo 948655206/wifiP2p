@@ -3,20 +3,22 @@ package com.android.wifip2pdemo.viewModel
 import android.app.Application
 import android.net.Uri
 import android.net.wifi.p2p.*
-import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.android.wifip2pdemo.utils.MediaUtils
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.*
+import com.blankj.utilcode.util.FileUtils
 import com.blankj.utilcode.util.LogUtils
+import com.blankj.utilcode.util.PathUtils
 import com.blankj.utilcode.util.ToastUtils
+import fileConfig.FileConfig
+import fileConfig.FileConfig.Config.Type.FILE
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.*
 import java.net.ServerSocket
 import java.net.Socket
-import java.text.SimpleDateFormat
-import java.util.*
 
 class WifiP2pViewModel(
     private val context: Application
@@ -70,8 +72,172 @@ class WifiP2pViewModel(
         _peerList.postValue(devices)
     }
 
+
+
+    fun createNewGroup() {
+        //为了防止已经有组创建，删除之前的组，重新创建
+        manager?.requestGroupInfo(
+            mChannel
+        ) { group ->
+            if (group != null) {
+                LogUtils.i("当前已经存在组")
+                manager?.removeGroup(mChannel, object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() {
+                        LogUtils.i("删除组成功...")
+                        createGroup()
+                    }
+
+                    override fun onFailure(p0: Int) {
+                        LogUtils.e("删除组失败...$p0")
+
+                    }
+
+                })
+            } else {
+                createGroup()
+            }
+        }
+
+    }
+
+    private fun createGroup() {
+        manager?.apply {
+            createGroup(mChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    LogUtils.i("创建组成功...")
+                    receiveMessage()
+                    _connectState.postValue(CONNECT_CREATER)
+                }
+
+                override fun onFailure(p0: Int) {
+                    LogUtils.e("创建组失败...$p0")
+                }
+
+            })
+        }
+    }
+
+    fun receiveMessage() {
+        try {
+            server = ServerSocket(port)
+            viewModelScope.launch(Dispatchers.IO) {
+                while (!server.isClosed) {
+                    LogUtils.i("阻塞中....")
+                    try {
+                        val socket = server.accept()
+
+                        viewModelScope.launch(Dispatchers.IO) {
+                            val inputStream = socket.getInputStream()
+                            //通过protobuf 获取定义的文件信息
+                            //原理是protobuf设置长度，所以不会和后面信息混淆
+                            val fileConfig = FileConfig.Config.parseDelimitedFrom(inputStream)
+
+
+                            when (fileConfig.type) {
+                                FileConfig.Config.Type.FILE -> {
+                                    //以后可以优化 目前是单个socket接收一段信息 没有粘包问题
+                                    val fileSize = fileConfig.fileSize
+                                    //类型是文件
+                                    val savePath =
+                                        PathUtils.getExternalDownloadsPath() + "/" + fileConfig.fileName
+                                    LogUtils.i("存储路径==>$savePath")
+
+                                    val bufferedInputStream = BufferedInputStream(inputStream)
+                                    val file = File(savePath)
+                                    if (file.exists()) {
+                                        file.delete()
+                                    }
+                                    file.createNewFile()
+                                    val fileOutputStream = FileOutputStream(file)
+
+                                    //开始接收数据的时间
+                                    val startTime = System.currentTimeMillis()
+                                    var lastPrintTime = startTime
+
+                                    //每次接收的数据大小
+                                    var len = 0
+                                    //总接收的数据大小
+                                    var totalSize = 0
+
+                                    while (bufferedInputStream.read(buffer).also {
+                                            len = it
+                                            totalSize += len
+                                        } != -1) {
+                                        fileOutputStream.write(buffer, 0, len)
+                                        val currentTime = System.currentTimeMillis()
+                                        //总共耗时
+                                        val totalTime = currentTime - startTime
+                                        if ((currentTime - lastPrintTime) >= 2000) {
+                                            //每两秒打印一次接收速率
+                                            LogUtils.i("平均接收速率==>${totalSize * 8 / 1000000.0 / totalTime}Mbps")
+                                            lastPrintTime = currentTime
+                                        }
+                                    }
+
+                                    //关闭流...
+                                    fileOutputStream.flush()
+                                    fileOutputStream.close()
+                                    socket.close()
+                                }
+
+                                FileConfig.Config.Type.TEXT -> {
+
+                                }
+                                FileConfig.Config.Type.UNRECOGNIZED -> {
+                                    LogUtils.i("收到未知文件流...")
+                                }
+                            }
+
+                        }
+                    } catch (e: Exception) {
+                        LogUtils.e("socket出错==>${e.toString()}")
+                    }
+
+                }
+
+            }
+        } catch (e: Exception) {
+            LogUtils.e("接收出错==>${e.toString()}")
+            server.close()
+        }
+
+    }
+    
+    //移除组
+    fun removeGroup() {
+        manager?.removeGroup(mChannel, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+                LogUtils.i("移除组成功...")
+                connectState.postValue(CONNECT_DISCONNECT)
+            }
+
+            override fun onFailure(p0: Int) {
+                //一般不会失败 如果失败 需要重启才能解决
+                LogUtils.e("移除组失败...$p0")
+            }
+        })
+    }
+
+    //取消连接
+    //改方法一般用于 正在连接中 还未连接成功的情况
+    fun cancelConnect(){
+        manager?.cancelConnect(mChannel,object :WifiP2pManager.ActionListener{
+            override fun onSuccess() {
+                LogUtils.i("取消连接成功...")
+                connectState.postValue(CONNECT_DISCONNECT)
+            }
+
+            override fun onFailure(p0: Int) {
+                LogUtils.e("取消连接失败...$p0")
+                //如果失败代表,已经建立连接,需要移除组
+                removeGroup()
+            }
+
+        })
+    }
+
     //连接成员
-    fun connectPeers(device: WifiP2pDevice) {
+    fun connect(device: WifiP2pDevice) {
         val config = WifiP2pConfig()
         config.deviceAddress = device.deviceAddress
         //是否想成为组长
@@ -95,213 +261,6 @@ class WifiP2pViewModel(
 
         })
     }
-
-    fun createNewGroup() {
-        //为了防止已经有组创建，删除之前的组，重新创建
-        manager?.requestGroupInfo(
-            mChannel
-        ) { group ->
-            if (group != null) {
-                LogUtils.i("当前已经存在组")
-                manager?.removeGroup(mChannel, object : WifiP2pManager.ActionListener {
-                    override fun onSuccess() {
-                        LogUtils.i("删除组成功...")
-                        createGroup()
-                    }
-
-                    override fun onFailure(p0: Int) {
-                        LogUtils.e("删除组失败...$p0")
-                    }
-
-                })
-            } else {
-                createGroup()
-            }
-        }
-
-    }
-
-    private fun createGroup() {
-        manager?.apply {
-            createGroup(mChannel, object : WifiP2pManager.ActionListener {
-                override fun onSuccess() {
-                    LogUtils.i("创建组成功...")
-                    receiveImage()
-                    _connectState.postValue(CONNECT_CREATER)
-                }
-
-                override fun onFailure(p0: Int) {
-                    LogUtils.e("创建组失败...$p0")
-                }
-
-            })
-        }
-    }
-
-    fun socketSendMessage(str: String) {
-        manager?.requestConnectionInfo(mChannel) { info ->
-            val address = info.groupOwnerAddress
-            if (address != null) {
-                ToastUtils.showShort("发送信息成功...")
-                viewModelScope.launch(Dispatchers.IO) {
-                    val socket = Socket(address.hostAddress, port)
-                    val outputStream = socket.getOutputStream()
-                    val byteArray = str.toByteArray()
-
-                    outputStream.write(byteArray)
-                    outputStream.flush()
-                    LogUtils.i("发送完毕...")
-                    socket.close()
-                }
-
-            } else {
-                ToastUtils.showShort("发送信息失败...")
-
-            }
-        }
-
-
-    }
-
-    fun receiveImage() {
-        LogUtils.i("开始接收图片...")
-        val byteArray = ByteArray(1024)
-        try {
-            val sockList= mutableListOf<Socket>()
-            server = ServerSocket(port)
-            viewModelScope.launch(Dispatchers.IO) {
-                while (true) {
-                    LogUtils.i("阻塞中...")
-                    try {
-                        val socket = server.accept()
-                        sockList.add(socket)
-                        viewModelScope.launch(Dispatchers.IO) {
-                            var startTime = System.currentTimeMillis()
-                            var totalRead = 0
-
-                            val inputStream = socket.getInputStream()
-                            var len: Int
-                            val packageName = context.packageName
-                            var totalByte = 0
-                            //创建文件夹
-                            val file =
-                                File(context.getExternalFilesDir(null), "$packageName/zxy.jpg")
-                            file.parentFile?.mkdir()
-                            LogUtils.i("路径为==>${file.absoluteFile}")
-
-                            val fileOutputStream = FileOutputStream(file)
-
-                            while (inputStream.read(byteArray).also {
-                                    len = it
-                                } != -1) {
-                                fileOutputStream.write(byteArray, 0, len)
-                                totalByte += len
-
-                                totalRead += len
-                                val currentTime = System.currentTimeMillis()
-                                if (currentTime - startTime >= 2000) {
-                                    // 每两秒打印一次接收速度
-                                    val speedMbps = totalRead * 8.0 / 2000000
-                                    LogUtils.i("接收速度：${speedMbps} Mbps")
-                                    totalRead = 0
-                                    startTime = currentTime
-                                }
-                            }
-
-                            fileOutputStream.flush()
-                            fileOutputStream.close()
-                            LogUtils.i("接收完毕...大小为..${totalByte / (1024.0 * 1024.0)}")
-
-                            socket.close()
-                            sockList.remove(socket)
-                            if (sockList.isEmpty()) {
-                                LogUtils.i("当前socket列表为空...")
-                            }
-                            val simpleDateFormat =
-                                SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
-                            val format = simpleDateFormat.format(Date(System.currentTimeMillis()))
-                            LogUtils.i("接收图片结束==>${format}")
-                        }
-                    } catch (e: Exception) {
-                        LogUtils.e("socket。。。${e.toString()}")
-                        break
-                    }
-                }
-
-            }
-        } catch (e: Exception) {
-            LogUtils.e("接收信息出错。。。${e.toString()}")
-        }
-    }
-
-    fun receiveMessage() {
-        LogUtils.i("开始接收信息...")
-        val byteArray = ByteArray(1024)
-        try {
-            server = ServerSocket(port)
-            viewModelScope.launch(Dispatchers.IO) {
-                while (true) {
-                    LogUtils.i("阻塞中...")
-                    try {
-                        val socket = server.accept()
-
-                        viewModelScope.launch(Dispatchers.IO) {
-                            val inputStream = socket.getInputStream()
-                            var len: Int
-                            val stringBuffer = StringBuffer()
-                            while (inputStream.read(byteArray).also {
-                                    len = it
-                                } != -1) {
-                                stringBuffer.append(String(byteArray, 0, len))
-                            }
-                            val string = stringBuffer.toString()
-                            LogUtils.i("收到的信息...$string")
-                            socket.close()
-                        }
-                    } catch (e: Exception) {
-                        LogUtils.e("socket。。。${e.toString()}")
-                        break
-                    }
-                }
-
-            }
-        } catch (e: Exception) {
-            LogUtils.e("接收信息出错。。。${e.toString()}")
-        }
-
-    }
-
-    fun removeGroup() {
-        manager?.apply {
-            cancelConnect(mChannel, object : WifiP2pManager.ActionListener {
-                override fun onSuccess() {
-                    LogUtils.i("断开连接成功...")
-                }
-
-                override fun onFailure(p0: Int) {
-                    LogUtils.e("断开连接失败...$p0")
-                    requestGroupInfo(mChannel) { group ->
-                        if (group != null) {
-                            removeGroup(mChannel, object : WifiP2pManager.ActionListener {
-                                override fun onSuccess() {
-                                    LogUtils.i("移除组成功....")
-                                    removeGroup()
-                                }
-
-                                override fun onFailure(p0: Int) {
-                                    LogUtils.i("移除组失败....$p0")
-                                }
-
-                            })
-                        }
-                    }
-                }
-
-            })
-
-        }
-    }
-
     fun disconnect() {
         try {
             //服务器断开连接...
@@ -311,18 +270,7 @@ class WifiP2pViewModel(
             }
             when (connectState.value) {
                 CONNECT_LOADING -> {
-                    manager?.cancelConnect(mChannel, object : WifiP2pManager.ActionListener {
-                        override fun onSuccess() {
-                            LogUtils.i("取消连接成功...")
-                            _connectState.postValue(CONNECT_DISCONNECT)
-                        }
-
-                        override fun onFailure(p0: Int) {
-                            LogUtils.e("取消连接失败...$p0")
-                        }
-
-                    })
-
+                    cancelConnect()
                 }
                 CONNECT_DISCONNECT -> {
                     LogUtils.i("未连接组....")
@@ -331,146 +279,93 @@ class WifiP2pViewModel(
 
                 }
                 else -> {
-                    manager?.removeGroup(mChannel, object : WifiP2pManager.ActionListener {
-                        override fun onSuccess() {
-                            LogUtils.i("移除组成功....")
-                            _connectState.postValue(CONNECT_DISCONNECT)
-                        }
-
-                        override fun onFailure(p0: Int) {
-                            LogUtils.e("移除组失败....$p0")
-                        }
-                    })
+                    removeGroup()
                 }
             }
         } catch (e: Exception) {
             LogUtils.e("退出失败...$e")
         }
-
-
     }
 
-    fun sendFile(uri: Uri){
-        if (connectState.value == CONNECT_SUCCESS) {
-            manager?.requestConnectionInfo(mChannel) { info ->
+
+    private val buffer by lazy {
+        ByteArray(1024 * 1024)
+    }
+
+    fun sendFileByUri(uri: Uri) {
+        manager?.requestConnectionInfo(mChannel) { info ->
+            info.groupOwnerAddress?.let { address ->
                 viewModelScope.launch(Dispatchers.IO) {
-//                    while (true) {
-
-                    val simpleDateFormat =
-                        SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
-                    val format = simpleDateFormat.format(Date(System.currentTimeMillis()))
-                    LogUtils.i("发送图片开始==>${format}")
-
-                    val inputStream = context.contentResolver.openInputStream(uri)!!
-
-                    var startTime = System.currentTimeMillis()
+                    LogUtils.i("阻塞中...")
+                    val socket = Socket(address, port)
                     try {
-                        val address = info.groupOwnerAddress
-                        if (address != null) {
-                            val socket = Socket(address, port)
-                            val outputStream = socket.getOutputStream()
-                            val buffer = ByteArray(1024 )
-                            var byteRead = 0
-                            var totalBytes = 0
-                            var totalReadSpeed = 0
+                        //输出流
+                        val outputStream = socket.getOutputStream()
 
-                            while (inputStream.read(buffer)
-                                    .also {
-                                        byteRead = it
-                                    } != -1
-                            ) {
-                                outputStream.write(buffer, 0, byteRead)
-                                totalBytes += byteRead
-                                totalReadSpeed += byteRead
+                        val filePath = MediaUtils.getRealPathFromUri(context, uri)
+                        val fileName = FileUtils.getFileName(filePath)
+                        val fileType = FileUtils.getFileExtension(filePath)
+                        val fileLength = FileUtils.getFileLength(filePath)
 
-                                val currentTime = System.currentTimeMillis()
-                                if (currentTime - startTime >= 2000) {
-                                    // 每两秒打印一次接收速度
-                                    val speedMbps = totalReadSpeed * 8.0 / 2000000
-                                    LogUtils.i("发送速度：${speedMbps} Mbps")
-                                    totalReadSpeed = 0
-                                    startTime = currentTime
-                                }
-                            }
-                            LogUtils.i("发送完毕...大小为${totalBytes / (1024.0 * 1024.0)}")
-                            socket.close()
-                        } else {
-                            ToastUtils.showShort("发送信息失败...")
-                        }
-                        inputStream.close()
-                    } catch (e: Exception) {
-                        LogUtils.e("意外结束..$e")
-                        inputStream.close()
-                    }
-//                    }
+                        val openInputStream = context.contentResolver.openInputStream(uri)
+                        LogUtils.i("filePath==>$filePath")
+                        LogUtils.i("fileType==>$fileType")
+                        LogUtils.i("fileName==>$fileName")
+                        LogUtils.i("fileLength==>$fileLength")
 
-                }
-            }
-        } else {
-            ToastUtils.showShort("wifiP2p未连接...")
-        }
-    }
-    fun sendImage(uri: Uri) {
-        if (connectState.value == CONNECT_SUCCESS) {
-            manager?.requestConnectionInfo(mChannel) { info ->
-                viewModelScope.launch(Dispatchers.IO) {
-//                    while (true) {
+                        //配置发送文件类型
+                        val fileConfig = FileConfig.Config.newBuilder()
 
-                        val inputStream = context.contentResolver.openInputStream(uri)!!
+                        fileConfig.apply {
+                            this.fileName = fileName
+                            this.type = FILE
+                        }.build().writeDelimitedTo(outputStream)
 
+                        //发送文件实体
+//                        val inputStream = BufferedInputStream(FileInputStream(filePath))
+                        val inputStream = BufferedInputStream(openInputStream)
+
+                        //总共发送大小
+                        var totalSize = 0
+                        //记录本次发送的字节大小
+                        var len = 0
+                        //当前时间
                         var startTime = System.currentTimeMillis()
-                        try {
-                            val address = info.groupOwnerAddress
-                            if (address != null) {
-                                val socket = Socket(address, port)
-                                val outputStream = socket.getOutputStream()
-                                val buffer = ByteArray(1024 )
-                                var byteRead = 0
-                                var totalBytes = 0
-                                var totalReadSpeed = 0
+                        //最后输出时间
+                        var lastPrintTime: Long = 0
 
-                                while (inputStream.read(buffer)
-                                        .also {
-                                            byteRead = it
-                                        } != -1
-                                ) {
-                                    outputStream.write(buffer, 0, byteRead)
-                                    totalBytes += byteRead
-                                    totalReadSpeed += byteRead
+                        while (inputStream.read(buffer).also {
+                                len = it
+                                totalSize += len
+                            } != -1) {
+                            outputStream.write(buffer, 0, len)
 
-                                    val currentTime = System.currentTimeMillis()
-                                    if (currentTime - startTime >= 2000) {
-                                        // 每两秒打印一次接收速度
-                                        val speedMbps = totalReadSpeed * 8.0 / 2000000
-                                        LogUtils.i("发送速度：${speedMbps} Mbps")
-                                        totalReadSpeed = 0
-                                        startTime = currentTime
-                                    }
-                                }
-                                LogUtils.i("发送完毕路...大小为${totalBytes / (1024.0 * 1024.0)}")
-                                socket.close()
-                            } else {
-                                ToastUtils.showShort("发送信息失败...")
+                            //当前时间
+                            val currentTime = System.currentTimeMillis()
+
+                            //总共花费时间
+                            var totalTime = currentTime - startTime
+                            if ((currentTime - lastPrintTime) >= 2000) {
+                                //每两秒打印一次传输速度
+                                LogUtils.i("平均发送速率==>${totalSize * 8 / 1000000.0 / totalTime}Mbps")
+                                lastPrintTime = currentTime
                             }
-                            inputStream.close()
-                        } catch (e: Exception) {
-                            LogUtils.e("意外结束..$e")
-                            inputStream.close()
                         }
-//                    }
+
+                        outputStream.flush()
+                        outputStream.close()
+                        socket.close()
+                    } catch (e: Exception) {
+                        socket.close()
+                        LogUtils.e("接收端socket出错==>${e.toString()}")
+                    }
 
                 }
             }
-        } else {
-            ToastUtils.showShort("wifiP2p未连接...")
         }
-
-
     }
 
-//    fun setConnectState(state: Boolean) {
-//        isConnected.postValue(state)
-//    }
+
 }
 
 enum class ChooseState {

@@ -3,14 +3,14 @@ syntax = "proto3";
 package fileConfig;
 
 message Config{
-    bytes content=1;
+    string fileName=1;
+
+    int32 fileSize=2;
 
     enum Type{
         FILE =0;
-        IMAGE =1;
-        TEXT =2;
+        TEXT =1;
     }
-    Type type=2;
-
+    Type type=3;
 
 }

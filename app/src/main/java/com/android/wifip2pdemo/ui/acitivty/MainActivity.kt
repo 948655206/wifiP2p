@@ -82,12 +82,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
             //本设备操作变更
             addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                addAction(WifiP2pManager.WIFI_P2P_DISCOVERY_CHANGED_ACTION)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                addAction(WifiP2pManager.EXTRA_WIFI_P2P_GROUP)
-            }
+            addAction(WifiP2pManager.EXTRA_WIFI_P2P_GROUP)
         }
 
         viewModel.connectState.observe(
@@ -102,6 +97,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                     ToastUtils.showShort("连接中...")
                 }
                 WifiP2pViewModel.ConnectState.CONNECT_SUCCESS -> {
+                    LogUtils.i("连接成功...")
                     ToastUtils.showShort("连接成功...")
                 }
                 WifiP2pViewModel.ConnectState.CONNECT_DISCONNECT -> {
@@ -127,7 +123,6 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             ChooseState.HOME_FRAGMENT -> {
                 LogUtils.i("HOME_FRAGMENT")
                 viewModel.disconnect()
-
             }
             ChooseState.SENDER_FRAGMENT -> {
                 LogUtils.i("SENDER_FRAGMENT")
@@ -135,6 +130,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             }
             ChooseState.RECEIVER_FRAGMENT -> {
                 LogUtils.i("RECEIVER_FRAGMENT")
+                manager.discoverPeers(mChannel, null)
                 viewModel.createNewGroup()
             }
             ChooseState.MESSAGE_FRAGMENT -> {
@@ -176,13 +172,13 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                     viewModel
                 ) {
                     LogUtils.i("打开相册...")
-                    val intentPick =
-                        Intent(Intent.ACTION_GET_CONTENT)
-                    intentPick.type="application/zip"
-                    startActivityForResult(intentPick, 666)
 //                    val intentPick =
-//                        Intent(Intent.ACTION_PICK,MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+//                        Intent(Intent.ACTION_GET_CONTENT)
+//                    intentPick.type="application/zip"
 //                    startActivityForResult(intentPick, 666)
+                    val intentPick =
+                        Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                    startActivityForResult(intentPick, 666)
                 }
                 viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
             }
@@ -194,9 +190,9 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         if (requestCode == 666 && resultCode == RESULT_OK) {
             val uri = data?.data!!
 
+
             //测试速率
-            viewModel.sendFile(uri)
-//            viewModel.sendImage(uri)
+            viewModel.sendFileByUri(uri)
         }
     }
 

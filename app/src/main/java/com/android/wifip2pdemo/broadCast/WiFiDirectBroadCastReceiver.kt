@@ -14,6 +14,7 @@ import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.CONNECT_C
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.CONNECT_SUCCESS
 import com.android.wifip2pdemo.viewModel.WifiState
 import com.blankj.utilcode.util.LogUtils
+import java.io.File
 
 
 /**
@@ -56,10 +57,11 @@ class WiFiDirectBroadcastReceiver(
                 viewModel.setState(WifiState.WIFI_P2P_PEERS_CHANGED_ACTION)
                 manager.apply {
                     requestPeers(channel) { peers ->
-                        viewModel.addPeer(peers.deviceList.toList())
+                        if (viewModel.chooseState.value==ChooseState.SENDER_FRAGMENT){
+                            viewModel.addPeer(peers.deviceList.toList())
+                        }
                     }
                 }
-
             }
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                 // Respond to new connection or disconnections
@@ -71,16 +73,19 @@ class WiFiDirectBroadcastReceiver(
                     val groupOwner = info.isGroupOwner
                     val formed = info.groupFormed
 
-
                     println("是否形成组==>$formed")
                     println("是否为组长==>${groupOwner}")
                     println("连接信息==>${address}")
 
-                    if (groupOwner){
+                    if (groupOwner) {
                         //如果是组长
                         viewModel.connectState.postValue(CONNECT_CREATER)
+                        manager.requestGroupInfo(channel){group->
+                            LogUtils.i("组员==>${group.clientList.size}")
+                            viewModel.addPeer(group.clientList.toList())
+                        }
                     }
-                    if (formed && !groupOwner){
+                    if (formed && !groupOwner) {
                         //如果是组长
                         viewModel.connectState.postValue(CONNECT_SUCCESS)
                     }

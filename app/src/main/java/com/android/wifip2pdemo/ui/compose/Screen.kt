@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -133,7 +132,7 @@ object Screen {
 
                         TextButton(
                             onClick = {
-                                viewModel.connectPeers(device)
+                                viewModel.connect(device)
                                 viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
                             }, modifier = Modifier
                                 .padding(5.dp)
@@ -189,7 +188,6 @@ object Screen {
                         }
                     }
                 }
-
             }
 
 
