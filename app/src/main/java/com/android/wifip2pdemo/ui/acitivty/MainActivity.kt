@@ -10,9 +10,13 @@ import android.content.pm.PackageManager
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.provider.MediaStore
+import androidx.compose.foundation.ScrollState.Companion.Saver
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.autoSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -64,6 +68,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             LogUtils.i("全部授予权限了...")
         }
 
+
         mChannel = manager.initialize(this, mainLooper, null)
         viewModel.manager = this.manager
         viewModel.mChannel = this.mChannel
@@ -85,30 +90,30 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             addAction(WifiP2pManager.EXTRA_WIFI_P2P_GROUP)
         }
 
-        viewModel.connectState.observe(
-            this
-        ) { value ->
-            when (value) {
-                WifiP2pViewModel.ConnectState.FIRST_TIME -> {
-                    ToastUtils.showShort("欢迎使用...")
-                }
-
-                WifiP2pViewModel.ConnectState.CONNECT_LOADING -> {
-                    ToastUtils.showShort("连接中...")
-                }
-                WifiP2pViewModel.ConnectState.CONNECT_SUCCESS -> {
-                    LogUtils.i("连接成功...")
-                    ToastUtils.showShort("连接成功...")
-                }
-                WifiP2pViewModel.ConnectState.CONNECT_DISCONNECT -> {
-                    ToastUtils.showShort("连接已断开...")
-                }
-                WifiP2pViewModel.ConnectState.CONNECT_CREATER -> {
-                    ToastUtils.showShort("等待发送端连接...")
-
-                }
-            }
-        }
+//        viewModel.connectState.observe(
+//            this
+//        ) { value ->
+//            when (value) {
+//                WifiP2pViewModel.ConnectState.FIRST_TIME -> {
+//                    ToastUtils.showShort("欢迎使用...")
+//                }
+//
+//                WifiP2pViewModel.ConnectState.CONNECT_LOADING -> {
+//                    ToastUtils.showShort("连接中...")
+//                }
+//                WifiP2pViewModel.ConnectState.CONNECT_SUCCESS -> {
+//                    LogUtils.i("连接成功...")
+//                    ToastUtils.showShort("连接成功...")
+//                }
+//                WifiP2pViewModel.ConnectState.CONNECT_DISCONNECT -> {
+//                    ToastUtils.showShort("连接已断开...")
+//                }
+//                WifiP2pViewModel.ConnectState.CONNECT_CREATER -> {
+//                    ToastUtils.showShort("等待发送端连接...")
+//
+//                }
+//            }
+//        }
     }
 
 
@@ -117,6 +122,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
     fun showTitle() {
 
         val chooseState by viewModel.chooseState.observeAsState()
+
         val navController = rememberNavController()
 
         when (chooseState) {
@@ -169,8 +175,9 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             composable(MESSAGE_FRAGMENT) {
                 Screen.messageFragment(
                     navController,
-                    viewModel
+                    viewModel,
                 ) {
+
                     LogUtils.i("打开相册...")
 //                    val intentPick =
 //                        Intent(Intent.ACTION_GET_CONTENT)
@@ -190,7 +197,6 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         if (requestCode == 666 && resultCode == RESULT_OK) {
             val uri = data?.data!!
 
-
             //测试速率
             viewModel.sendFileByUri(uri)
         }
@@ -208,10 +214,12 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
     @Composable
     override fun setView() {
         showTitle()
+
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        LogUtils.i("看不见了...")
         viewModel.disconnect()
         unregisterReceiver(receiver)
     }

@@ -1,22 +1,27 @@
 package com.android.wifip2pdemo.ui.compose
 
 import android.annotation.SuppressLint
+import android.net.MacAddress
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
+import com.blankj.utilcode.util.LogUtils
 
 @Suppress("TODO")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,6 +43,8 @@ object Screen {
             content = {
                 Column(
                     modifier = Modifier.padding(it),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     TextButton(onClick = {
                         navController.navigate(RECEIVER_FRAGMENT)
@@ -129,11 +136,13 @@ object Screen {
             content = {
                 listState?.let {
                     items(listState) { device ->
-
                         TextButton(
                             onClick = {
-                                viewModel.connect(device)
-                                viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+                                if (viewModel.chooseState.value == ChooseState.SENDER_FRAGMENT) {
+                                    viewModel.connect(device)
+                                    viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+                                }
+
                             }, modifier = Modifier
                                 .padding(5.dp)
                                 .fillMaxWidth()
@@ -141,9 +150,9 @@ object Screen {
                             Text(text = device.deviceName)
                         }
 
+
                     }
                 }
-
             }
         )
     }
@@ -152,9 +161,10 @@ object Screen {
     fun messageFragment(
         navController: NavHostController,
         viewModel: WifiP2pViewModel,
-        send: () -> Unit
+        send: () -> Unit,
     ) {
         val connectState by viewModel.connectState.observeAsState()
+
 
         Scaffold(
             topBar = {
@@ -167,26 +177,63 @@ object Screen {
             when (connectState) {
                 WifiP2pViewModel.ConnectState.CONNECT_LOADING -> {
                     Box(
-                        modifier = Modifier.padding(it).fillMaxSize(),
+                        modifier = Modifier
+                            .padding(it)
+                            .fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
                     }
                 }
                 else -> {
-                    Column(
-                        modifier = Modifier.padding(it),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    val density = LocalDensity.current
+                    var isVisible by remember {
+                        mutableStateOf(true)
+                    }
+                    AnimatedVisibility(
+                        visible = isVisible, enter = slideInVertically {
+                            with(density) { -40.dp.roundToPx() }
+                        } + expandVertically(
+                            expandFrom = Alignment.Top
+                        ) + fadeIn(
+                            initialAlpha = 0.3f
+                        ), exit = slideOutVertically() + shrinkVertically() + fadeOut()
                     ) {
-                        IconButton(
-                            onClick = {
-                                send.invoke()
-                            },
+                        Column(
+                            modifier = Modifier
+                                .padding(it)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(imageVector = Icons.Default.Info, null)
+                            IconButton(
+                                onClick = {
+                                    send.invoke()
+                                },
+                            ) {
+                                Icon(imageVector = Icons.Default.Info, null)
+                            }
+                            var text by remember { mutableStateOf("") }
+                            TextField(value = text,
+                                onValueChange = { it ->
+                                    text = it
+                                }, label = {
+                                    "请在此输入内容"
+                                }, trailingIcon = {
+                                    IconButton(onClick = {
+                                        LogUtils.i("发送图标...")
+                                        viewModel.sendText(text)
+                                        text = ""
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Send,
+                                            contentDescription = null
+                                        )
+                                    }
+                                })
                         }
                     }
+
                 }
             }
 

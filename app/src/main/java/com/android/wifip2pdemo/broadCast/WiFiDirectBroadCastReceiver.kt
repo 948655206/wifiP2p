@@ -81,8 +81,11 @@ class WiFiDirectBroadcastReceiver(
                         //如果是组长
                         viewModel.connectState.postValue(CONNECT_CREATER)
                         manager.requestGroupInfo(channel){group->
-                            LogUtils.i("组员==>${group.clientList.size}")
-                            viewModel.addPeer(group.clientList.toList())
+                            group?.let {
+                                LogUtils.i("组员==>${it.clientList.size}")
+                                viewModel.addPeer(it.clientList.toList())
+
+                            }
                         }
                     }
                     if (formed && !groupOwner) {

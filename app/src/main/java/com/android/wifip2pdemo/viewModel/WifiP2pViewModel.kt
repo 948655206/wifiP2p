@@ -1,8 +1,12 @@
 package com.android.wifip2pdemo.viewModel
 
 import android.app.Application
+import android.net.MacAddress
 import android.net.Uri
+import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.*
+import android.os.Build
+import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
@@ -14,6 +18,7 @@ import com.blankj.utilcode.util.PathUtils
 import com.blankj.utilcode.util.ToastUtils
 import fileConfig.FileConfig
 import fileConfig.FileConfig.Config.Type.FILE
+import fileConfig.FileConfig.Config.Type.TEXT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.*
@@ -33,7 +38,7 @@ class WifiP2pViewModel(
     val chooseState = _chooseState
 
     //设备列表
-    private val _peerList = MutableLiveData<List<WifiP2pDevice>>()
+    private val _peerList = MutableLiveData<List<WifiP2pDevice>>(emptyList())
     val peerList = _peerList
 
 
@@ -72,8 +77,6 @@ class WifiP2pViewModel(
         _peerList.postValue(devices)
     }
 
-
-
     fun createNewGroup() {
         //为了防止已经有组创建，删除之前的组，重新创建
         manager?.requestGroupInfo(
@@ -89,7 +92,6 @@ class WifiP2pViewModel(
 
                     override fun onFailure(p0: Int) {
                         LogUtils.e("删除组失败...$p0")
-
                     }
 
                 })
@@ -100,23 +102,60 @@ class WifiP2pViewModel(
 
     }
 
+    private val pin = "12345678"
+    private val netWorkName = "DIRECT-xy-zxy"
     private fun createGroup() {
-        manager?.apply {
-            createGroup(mChannel, object : WifiP2pManager.ActionListener {
-                override fun onSuccess() {
-                    LogUtils.i("创建组成功...")
-                    receiveMessage()
-                    _connectState.postValue(CONNECT_CREATER)
-                }
 
-                override fun onFailure(p0: Int) {
-                    LogUtils.e("创建组失败...$p0")
-                }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            LogUtils.i("Android10以上创建组...")
 
-            })
+            val wifiP2pConfig = WifiP2pConfig.Builder()
+                .setNetworkName(netWorkName)
+                .setPassphrase(pin)
+                .build()
+
+            manager?.apply {
+                LogUtils.i("Android10以上创建组...")
+                createGroup(mChannel!!, wifiP2pConfig, object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() {
+                        LogUtils.i("创建组成功...")
+                        LogUtils.i("组长配置==>${wifiP2pConfig.wps.pin}")
+                        LogUtils.i("组长配置==>${wifiP2pConfig.wps.pin}")
+                        LogUtils.i("组长配置==>${wifiP2pConfig.groupOwnerIntent}")
+                        LogUtils.i("组长配置==>${wifiP2pConfig.wps.setup}")
+                        receiveMessage()
+                        _connectState.postValue(CONNECT_CREATER)
+                    }
+
+                    override fun onFailure(p0: Int) {
+                        LogUtils.e("创建组失败...$p0")
+                    }
+
+                })
+            }
+
+        } else {
+            LogUtils.i("低版本创建组...")
+            manager?.apply {
+                createGroup(mChannel, object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() {
+                        LogUtils.i("创建组成功...")
+                        receiveMessage()
+                        _connectState.postValue(CONNECT_CREATER)
+                    }
+
+                    override fun onFailure(p0: Int) {
+                        LogUtils.e("创建组失败...$p0")
+                    }
+
+                })
+            }
         }
+
+
     }
 
+    private val sockList = mutableStateListOf<Socket>()
     fun receiveMessage() {
         try {
             server = ServerSocket(port)
@@ -125,6 +164,8 @@ class WifiP2pViewModel(
                     LogUtils.i("阻塞中....")
                     try {
                         val socket = server.accept()
+
+                        sockList.add(socket)
 
                         viewModelScope.launch(Dispatchers.IO) {
                             val inputStream = socket.getInputStream()
@@ -181,7 +222,19 @@ class WifiP2pViewModel(
                                 }
 
                                 FileConfig.Config.Type.TEXT -> {
+                                    val bufferedInputStream = BufferedInputStream(inputStream)
+                                    var len = 0
+                                    val stringBuilder = StringBuilder()
+                                    while (bufferedInputStream.read(buffer).also {
+                                            len = it
+                                        } != -1) {
+                                        val string = String(buffer, 0, len)
+                                        stringBuilder.append(string)
+                                    }
+                                    ToastUtils.showShort("收到消息了==>${stringBuilder.toString()}")
 
+                                    bufferedInputStream.close()
+                                    socket.close()
                                 }
                                 FileConfig.Config.Type.UNRECOGNIZED -> {
                                     LogUtils.i("收到未知文件流...")
@@ -190,7 +243,9 @@ class WifiP2pViewModel(
 
                         }
                     } catch (e: Exception) {
+
                         LogUtils.e("socket出错==>${e.toString()}")
+
                     }
 
                 }
@@ -198,11 +253,13 @@ class WifiP2pViewModel(
             }
         } catch (e: Exception) {
             LogUtils.e("接收出错==>${e.toString()}")
-            server.close()
+            if (::server.isInitialized) {
+                server.close()
+            }
         }
 
     }
-    
+
     //移除组
     fun removeGroup() {
         manager?.removeGroup(mChannel, object : WifiP2pManager.ActionListener {
@@ -220,8 +277,8 @@ class WifiP2pViewModel(
 
     //取消连接
     //改方法一般用于 正在连接中 还未连接成功的情况
-    fun cancelConnect(){
-        manager?.cancelConnect(mChannel,object :WifiP2pManager.ActionListener{
+    private fun cancelConnect() {
+        manager?.cancelConnect(mChannel, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 LogUtils.i("取消连接成功...")
                 connectState.postValue(CONNECT_DISCONNECT)
@@ -238,33 +295,66 @@ class WifiP2pViewModel(
 
     //连接成员
     fun connect(device: WifiP2pDevice) {
-        val config = WifiP2pConfig()
-        config.deviceAddress = device.deviceAddress
-        //是否想成为组长
-        config.groupOwnerIntent = owner
 
-        LogUtils.i("连接地址==>${config.deviceAddress}")
-        manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
-            override fun onSuccess() {
-                LogUtils.i("连接中....${device.deviceName}")
-                _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
-                connectState.postValue(CONNECT_LOADING)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 
-            override fun onFailure(p0: Int) {
-                LogUtils.i("连接失败...$p0")
-                if (p0 == 2) {
-                    ToastUtils.showShort("已建立连接...")
-                    connectState.postValue(CONNECT_SUCCESS)
+            LogUtils.i("高Android10版本连接...")
+            val config = WifiP2pConfig.Builder()
+                .setPassphrase(pin)
+                .setNetworkName(netWorkName)
+                .setDeviceAddress(MacAddress.fromString(device.deviceAddress))
+                .build()
+
+            manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    LogUtils.i("连接中....${device.deviceAddress}")
+                    LogUtils.i("连接中....${config.deviceAddress}")
+                    _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+                    connectState.postValue(CONNECT_LOADING)
                 }
-            }
 
-        })
+                override fun onFailure(p0: Int) {
+                    LogUtils.i("连接失败...$p0")
+                    if (p0 == 2) {
+                        ToastUtils.showShort("已建立连接...")
+                        connectState.postValue(CONNECT_SUCCESS)
+                    }
+                }
+
+            })
+        } else {
+            LogUtils.i("低版本连接...")
+            val config = WifiP2pConfig()
+            config.deviceAddress = device.deviceAddress
+            //是否想成为组长
+            config.groupOwnerIntent = owner
+
+
+            LogUtils.i("连接地址==>${config.deviceAddress}")
+            manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    LogUtils.i("连接中....${device.deviceName}")
+                    LogUtils.i("配置密码...${config.wps.pin}")
+                    _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+                    connectState.postValue(CONNECT_LOADING)
+                }
+
+                override fun onFailure(p0: Int) {
+                    LogUtils.i("连接失败...$p0")
+                    if (p0 == 2) {
+                        ToastUtils.showShort("已建立连接...")
+                        connectState.postValue(CONNECT_SUCCESS)
+                    }
+                }
+
+            })
+        }
+
     }
+
     fun disconnect() {
         try {
             //服务器断开连接...
-
             if (::server.isInitialized) {
                 server.close()
             }
@@ -296,7 +386,6 @@ class WifiP2pViewModel(
         manager?.requestConnectionInfo(mChannel) { info ->
             info.groupOwnerAddress?.let { address ->
                 viewModelScope.launch(Dispatchers.IO) {
-                    LogUtils.i("阻塞中...")
                     val socket = Socket(address, port)
                     try {
                         //输出流
@@ -324,6 +413,68 @@ class WifiP2pViewModel(
                         //发送文件实体
 //                        val inputStream = BufferedInputStream(FileInputStream(filePath))
                         val inputStream = BufferedInputStream(openInputStream)
+
+                        //总共发送大小
+                        var totalSize = 0
+                        //记录本次发送的字节大小
+                        var len = 0
+                        //当前时间
+                        var startTime = System.currentTimeMillis()
+                        //最后输出时间
+                        var lastPrintTime: Long = 0
+
+                        while (inputStream.read(buffer).also {
+                                len = it
+                                totalSize += len
+                            } != -1) {
+                            outputStream.write(buffer, 0, len)
+
+                            //当前时间
+                            val currentTime = System.currentTimeMillis()
+
+                            //总共花费时间
+                            var totalTime = currentTime - startTime
+                            if ((currentTime - lastPrintTime) >= 2000) {
+                                //每两秒打印一次传输速度
+                                LogUtils.i("平均发送速率==>${totalSize * 8 / 1000000.0 / totalTime}Mbps")
+                                lastPrintTime = currentTime
+                            }
+                        }
+
+                        outputStream.flush()
+                        outputStream.close()
+                        socket.close()
+                    } catch (e: Exception) {
+                        socket.close()
+                        LogUtils.e("接收端socket出错==>${e.toString()}")
+                    }
+
+                }
+            }
+        }
+    }
+
+    fun sendText(text: String) {
+        manager?.requestConnectionInfo(mChannel) { info ->
+            info.groupOwnerAddress?.let { address ->
+                viewModelScope.launch(Dispatchers.IO) {
+                    val socket = Socket(address, port)
+                    try {
+                        //输出流
+                        val outputStream = socket.getOutputStream()
+
+
+                        //配置发送文件类型
+                        val fileConfig = FileConfig.Config.newBuilder()
+
+                        fileConfig.apply {
+                            this.fileName = text
+                            this.type = TEXT
+                        }.build().writeDelimitedTo(outputStream)
+
+                        //发送文件实体
+//                        val inputStream = BufferedInputStream(FileInputStream(filePath))
+                        val inputStream = BufferedInputStream(text.byteInputStream())
 
                         //总共发送大小
                         var totalSize = 0
