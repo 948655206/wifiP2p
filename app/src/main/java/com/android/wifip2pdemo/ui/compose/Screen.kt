@@ -31,75 +31,9 @@ object Screen {
     const val RECEIVER_FRAGMENT = "RECEIVER"
     const val MESSAGE_FRAGMENT = "MESSAGE"
 
-    @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-    @Composable
-    fun homeFragment(
-        navController: NavHostController,
-    ) {
-        Scaffold(
-            topBar = {
-                setTopBar(title = "主页")
-            },
-            content = {
-                Column(
-                    modifier = Modifier.padding(it),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    TextButton(onClick = {
-                        navController.navigate(RECEIVER_FRAGMENT)
-
-                    }) {
-                        Text(text = "接收端")
-                    }
-                    TextButton(onClick = {
-                        navController.navigate(SENDER_FRAGMENT)
-                    }) {
-                        Text(text = "发送端")
-                    }
-                }
-            },
-        )
-    }
 
     @Composable
-    fun senderFragment(
-        navController: NavHostController,
-        viewModel: WifiP2pViewModel,
-    ) {
-        //表示不想成为组长
-        viewModel.owner == 0
-        Scaffold(
-            topBar = {
-                setTopBar(
-                    title = "发送端",
-                    back = { navController.navigateUp() }
-                )
-            }) {
-            lazyItem(it, viewModel)
-        }
-    }
-
-
-    @Composable
-    fun receiverFragment(
-        navController: NavHostController,
-        viewModel: WifiP2pViewModel,
-    ) {
-        //表示想成为组长
-        viewModel.owner = 15
-        Scaffold(topBar = {
-            setTopBar(
-                title = "接收端",
-                back = { navController.navigateUp() }
-            )
-        }) {
-            lazyItem(it, viewModel)
-        }
-    }
-
-    @Composable
-    private fun setTopBar(
+    fun setTopBar(
         title: String,
 //        back: NavHostController?=null,
         back: (() -> Any?)? = null,
@@ -123,7 +57,7 @@ object Screen {
     }
 
     @Composable
-    private fun lazyItem(
+    fun lazyItem(
         it: PaddingValues,
         viewModel: WifiP2pViewModel,
     ) {
@@ -133,112 +67,35 @@ object Screen {
                 .padding(it)
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
             content = {
-                listState?.let {
-                    items(listState) { device ->
-                        TextButton(
-                            onClick = {
-                                if (viewModel.chooseState.value == ChooseState.SENDER_FRAGMENT) {
-                                    viewModel.connect(device)
-                                    viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
-                                }
+                item{
+                    if (listState.isEmpty()) {
+                        CircularProgressIndicator()
+                    }
+                }
+                items(listState) { device ->
 
-                            }, modifier = Modifier
-                                .padding(5.dp)
-                                .fillMaxWidth()
-                        ) {
-                            Text(text = device.deviceName)
-                        }
+                    TextButton(
+                        onClick = {
+                            if (viewModel.chooseState.value == ChooseState.SENDER_FRAGMENT) {
+                                viewModel.connect(device)
+                                viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+                            }else{
+                                LogUtils.i("该条目被点击了...")
+                            }
 
-
+                        }, modifier = Modifier
+                            .padding(5.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Text(text = device.deviceName)
                     }
                 }
             }
         )
     }
 
-    @Composable
-    fun messageFragment(
-        navController: NavHostController,
-        viewModel: WifiP2pViewModel,
-        send: () -> Unit,
-    ) {
-        val connectState by viewModel.connectState.observeAsState()
 
-
-        Scaffold(
-            topBar = {
-                setTopBar(title = "文件传输页", back = {
-                    navController.navigateUp()
-                    viewModel.disconnect()
-                })
-            }
-        ) {
-            when (connectState) {
-                WifiP2pViewModel.ConnectState.CONNECT_LOADING -> {
-                    Box(
-                        modifier = Modifier
-                            .padding(it)
-                            .fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-                else -> {
-                    val density = LocalDensity.current
-                    var isVisible by remember {
-                        mutableStateOf(true)
-                    }
-                    AnimatedVisibility(
-                        visible = isVisible, enter = slideInVertically {
-                            with(density) { -40.dp.roundToPx() }
-                        } + expandVertically(
-                            expandFrom = Alignment.Top
-                        ) + fadeIn(
-                            initialAlpha = 0.3f
-                        ), exit = slideOutVertically() + shrinkVertically() + fadeOut()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(it)
-                                .fillMaxWidth(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    send.invoke()
-                                },
-                            ) {
-                                Icon(imageVector = Icons.Default.Info, null)
-                            }
-                            var text by remember { mutableStateOf("") }
-                            TextField(value = text,
-                                onValueChange = { it ->
-                                    text = it
-                                }, label = {
-                                    "请在此输入内容"
-                                }, trailingIcon = {
-                                    IconButton(onClick = {
-                                        LogUtils.i("发送图标...")
-                                        viewModel.sendText(text)
-                                        text = ""
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Send,
-                                            contentDescription = null
-                                        )
-                                    }
-                                })
-                        }
-                    }
-
-                }
-            }
-
-
-        }
-    }
 
 }

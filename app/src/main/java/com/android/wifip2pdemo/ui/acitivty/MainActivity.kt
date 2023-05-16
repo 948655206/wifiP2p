@@ -27,6 +27,10 @@ import com.android.wifip2pdemo.ui.compose.Screen.HOME_FRAGMENT
 import com.android.wifip2pdemo.ui.compose.Screen.MESSAGE_FRAGMENT
 import com.android.wifip2pdemo.ui.compose.Screen.RECEIVER_FRAGMENT
 import com.android.wifip2pdemo.ui.compose.Screen.SENDER_FRAGMENT
+import com.android.wifip2pdemo.ui.compose.fragment.HomeFragment.homeFragment
+import com.android.wifip2pdemo.ui.compose.fragment.MessageFragment.messageFragment
+import com.android.wifip2pdemo.ui.compose.fragment.ReceiveFragment.receiverFragment
+import com.android.wifip2pdemo.ui.compose.fragment.SenderFragment.senderFragment
 import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
 import com.blankj.utilcode.util.LogUtils
@@ -47,6 +51,21 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
 
 
     override fun setEvent() {
+
+        val sdkVersion = Build.VERSION.SDK_INT
+        val isWifiP2pSupported = packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)
+
+        if (sdkVersion >= Build.VERSION_CODES.ICE_CREAM_SANDWICH && isWifiP2pSupported) {
+            // 设备支持 WifiP2p 功能
+            // 进行相应的处理
+            LogUtils.i("有权限")
+        } else {
+            // 设备不支持 WifiP2p 功能
+            // 提示用户该设备不支持该功能
+            LogUtils.i("无权限")
+        }
+
+
         //请求权限
         val permissions = arrayOf(
             Manifest.permission.ACCESS_WIFI_STATE,
@@ -127,7 +146,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
 
         when (chooseState) {
             ChooseState.HOME_FRAGMENT -> {
-                LogUtils.i("HOME_FRAGMENT")
+                 LogUtils.i("HOME_FRAGMENT")
                 viewModel.disconnect()
             }
             ChooseState.SENDER_FRAGMENT -> {
@@ -137,7 +156,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             ChooseState.RECEIVER_FRAGMENT -> {
                 LogUtils.i("RECEIVER_FRAGMENT")
                 manager.discoverPeers(mChannel, null)
-                viewModel.createNewGroup()
+//                viewModel.createNewGroup()
             }
             ChooseState.MESSAGE_FRAGMENT -> {
                 navController.navigate(MESSAGE_FRAGMENT)
@@ -148,7 +167,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         }
         NavHost(navController = navController, startDestination = HOME_FRAGMENT) {
             composable(HOME_FRAGMENT) {
-                Screen.homeFragment(
+                homeFragment(
                     navController,
                 )
                 viewModel.chooseState.postValue(ChooseState.HOME_FRAGMENT)
@@ -156,7 +175,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             }
 
             composable(SENDER_FRAGMENT) {
-                Screen.senderFragment(
+                senderFragment(
                     navController,
                     viewModel
                 )
@@ -164,7 +183,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             }
 
             composable(RECEIVER_FRAGMENT) {
-                Screen.receiverFragment(
+                receiverFragment(
                     navController,
                     viewModel
                 )
@@ -173,7 +192,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             }
 
             composable(MESSAGE_FRAGMENT) {
-                Screen.messageFragment(
+                messageFragment(
                     navController,
                     viewModel,
                 ) {

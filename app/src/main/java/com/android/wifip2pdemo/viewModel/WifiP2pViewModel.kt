@@ -3,13 +3,17 @@ package com.android.wifip2pdemo.viewModel
 import android.app.Application
 import android.net.MacAddress
 import android.net.Uri
+import android.net.wifi.WifiInfo
 import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.*
+import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
+import android.net.wifi.p2p.nsd.WifiP2pServiceInfo
 import android.os.Build
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.android.wifip2pdemo.ui.compose.fragment.ReceiveFragment
 import com.android.wifip2pdemo.utils.MediaUtils
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.*
 import com.blankj.utilcode.util.FileUtils
@@ -102,25 +106,52 @@ class WifiP2pViewModel(
 
     }
 
-    private val pin = "12345678"
-    private val netWorkName = "DIRECT-xy-zxy"
-    private fun createGroup() {
+    fun createNewGroup(info: ReceiveFragment.P2pInfo) {
+        //为了防止已经有组创建，删除之前的组，重新创建
+        manager?.requestGroupInfo(
+            mChannel
+        ) { group ->
+            if (group != null) {
+                LogUtils.i("当前已经存在组")
+                manager?.removeGroup(mChannel, object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() {
+                        LogUtils.i("删除组成功...")
+                        createByInfo(info)
+//                        createGroup()
+                    }
 
+                    override fun onFailure(p0: Int) {
+                        LogUtils.e("删除组失败...$p0")
+                    }
+
+                })
+            } else {
+                createByInfo(info)
+//                createGroup()
+
+            }
+        }
+    }
+
+    //设置组信息
+    fun createByInfo(info: ReceiveFragment.P2pInfo) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            LogUtils.i("Android10以上创建组...")
-
             val wifiP2pConfig = WifiP2pConfig.Builder()
-                .setNetworkName(netWorkName)
-                .setPassphrase(pin)
+                .setNetworkName(info.netWorkName)
+                .setPassphrase(info.pin)
+                .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
                 .build()
+
+            LogUtils.i("info.netWorkName==>${info.netWorkName}")
+            LogUtils.i("info.pin==>${info.pin}")
 
             manager?.apply {
                 LogUtils.i("Android10以上创建组...")
+
                 createGroup(mChannel!!, wifiP2pConfig, object : WifiP2pManager.ActionListener {
                     override fun onSuccess() {
                         LogUtils.i("创建组成功...")
-                        LogUtils.i("组长配置==>${wifiP2pConfig.wps.pin}")
-                        LogUtils.i("组长配置==>${wifiP2pConfig.wps.pin}")
+                        LogUtils.i("组长密码==>${wifiP2pConfig.wps.pin}")
                         LogUtils.i("组长配置==>${wifiP2pConfig.groupOwnerIntent}")
                         LogUtils.i("组长配置==>${wifiP2pConfig.wps.setup}")
                         receiveMessage()
@@ -133,8 +164,20 @@ class WifiP2pViewModel(
 
                 })
             }
+        }
+    }
 
-        } else {
+    private val pin = "12345678"
+    private val netWorkName = "DIRECT-xy-zxy"
+
+
+    private fun createGroup() {
+
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//            LogUtils.i("Android10以上创建组...")
+//
+//
+//        } else {
             LogUtils.i("低版本创建组...")
             manager?.apply {
                 createGroup(mChannel, object : WifiP2pManager.ActionListener {
@@ -146,11 +189,14 @@ class WifiP2pViewModel(
 
                     override fun onFailure(p0: Int) {
                         LogUtils.e("创建组失败...$p0")
+                        if (p0 == 2) {
+                            removeGroup()
+                        }
                     }
 
                 })
             }
-        }
+//        }
 
 
     }
@@ -293,7 +339,7 @@ class WifiP2pViewModel(
         })
     }
 
-    //连接成员
+    //连接组
     fun connect(device: WifiP2pDevice) {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -305,10 +351,19 @@ class WifiP2pViewModel(
                 .setDeviceAddress(MacAddress.fromString(device.deviceAddress))
                 .build()
 
+            LogUtils.i("config.deviceAddress${config.deviceAddress}")
+            LogUtils.i("是否支持keyPad==>${device.wpsKeypadSupported()}")
+            LogUtils.i("是否支持DisPlayer==>${device.wpsDisplaySupported()}")
+            LogUtils.i("是否支持PBC==>${device.wpsPbcSupported()}")
+            LogUtils.i("device.describeContents()==>${device.describeContents()}")
+            LogUtils.i("device.primaryDeviceType==>${device.primaryDeviceType}")
+            LogUtils.i("device.secondaryDeviceType==>${device.secondaryDeviceType}")
+
             manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
                 override fun onSuccess() {
-                    LogUtils.i("连接中....${device.deviceAddress}")
-                    LogUtils.i("连接中....${config.deviceAddress}")
+                    LogUtils.i("连接中....${owner}")
+                    LogUtils.i("连接中....${config.passphrase}")
+                    LogUtils.i("连接中....${config.wps.pin}")
                     _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
                     connectState.postValue(CONNECT_LOADING)
                 }
@@ -326,6 +381,7 @@ class WifiP2pViewModel(
             LogUtils.i("低版本连接...")
             val config = WifiP2pConfig()
             config.deviceAddress = device.deviceAddress
+            config.wps.setup=WpsInfo.PBC
             //是否想成为组长
             config.groupOwnerIntent = owner
 
@@ -335,6 +391,7 @@ class WifiP2pViewModel(
                 override fun onSuccess() {
                     LogUtils.i("连接中....${device.deviceName}")
                     LogUtils.i("配置密码...${config.wps.pin}")
+                    LogUtils.i("是否为组员...${owner}")
                     _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
                     connectState.postValue(CONNECT_LOADING)
                 }

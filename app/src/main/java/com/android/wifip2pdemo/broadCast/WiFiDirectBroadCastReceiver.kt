@@ -5,8 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.NetworkInfo
 import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pGroup
+import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
+import android.os.Parcelable
 import androidx.annotation.RequiresApi
 import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
@@ -57,7 +60,7 @@ class WiFiDirectBroadcastReceiver(
                 viewModel.setState(WifiState.WIFI_P2P_PEERS_CHANGED_ACTION)
                 manager.apply {
                     requestPeers(channel) { peers ->
-                        if (viewModel.chooseState.value==ChooseState.SENDER_FRAGMENT){
+                        if (viewModel.chooseState.value == ChooseState.SENDER_FRAGMENT) {
                             viewModel.addPeer(peers.deviceList.toList())
                         }
                     }
@@ -67,6 +70,7 @@ class WiFiDirectBroadcastReceiver(
                 // Respond to new connection or disconnections
                 viewModel.setState(WifiState.WIFI_P2P_CONNECTION_CHANGED_ACTION)
                 LogUtils.i("连接状态改变...")
+
 
                 manager.requestConnectionInfo(channel) { info ->
                     val address = info.groupOwnerAddress
@@ -80,7 +84,7 @@ class WiFiDirectBroadcastReceiver(
                     if (groupOwner) {
                         //如果是组长
                         viewModel.connectState.postValue(CONNECT_CREATER)
-                        manager.requestGroupInfo(channel){group->
+                        manager.requestGroupInfo(channel) { group ->
                             group?.let {
                                 LogUtils.i("组员==>${it.clientList.size}")
                                 viewModel.addPeer(it.clientList.toList())
@@ -93,6 +97,8 @@ class WiFiDirectBroadcastReceiver(
                         viewModel.connectState.postValue(CONNECT_SUCCESS)
                     }
                 }
+
+
             }
             WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
                 // Respond to this device's wifi state changing
