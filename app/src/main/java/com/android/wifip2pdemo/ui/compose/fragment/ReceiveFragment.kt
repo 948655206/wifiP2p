@@ -1,21 +1,22 @@
 package com.android.wifip2pdemo.ui.compose.fragment
 
 import android.annotation.SuppressLint
+import android.net.wifi.WifiInfo
+import android.net.wifi.WpsInfo
+import android.net.wifi.WpsInfo.DISPLAY
+import android.net.wifi.WpsInfo.PBC
 import android.os.Build
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Modifier.Companion
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.android.wifip2pdemo.ui.compose.Screen
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
@@ -41,7 +42,7 @@ object ReceiveFragment {
                 title = "接收端",
                 back = { navController.navigateUp() }
             )
-        }) {
+        }) { it ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 //显示内容页面
                 val isCreate = remember {
@@ -55,7 +56,7 @@ object ReceiveFragment {
                     val pin = remember {
                         mutableStateOf(pin)
                     }
-
+                    var switchState by remember { mutableStateOf(false) }
                     //Android10
                     LazyColumn(
                         modifier = Modifier
@@ -65,52 +66,78 @@ object ReceiveFragment {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         item {
-                            TextField(
-                                value = netWorkName.value,
-                                label = {
-                                    Text(text = "请输入NetWork")
-                                },
-                                onValueChange = { text ->
-                                    netWorkName.value = text
-                                })
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "是否自定义PIN")
+                                Spacer(modifier = Modifier.padding(10.dp))
+                                Switch(
+                                    checked = switchState,
+                                    onCheckedChange = { isChecked ->
+                                        switchState = isChecked
+                                    })
+                            }
                         }
-                        item {
-                            TextField(
-                                value = pin.value,
-                                label = {
-                                    Text(text = "请输入NetWork")
-                                },
-                                onValueChange = { text ->
-                                    pin.value = text
-                                })
+                        if (switchState) {
+                            item {
+                                TextField(
+                                    value = netWorkName.value,
+                                    label = {
+                                        Text(text = "请输入NetWork")
+                                    },
+                                    onValueChange = { text ->
+                                        netWorkName.value = text
+                                    })
+                            }
+                            item {
+                                TextField(
+                                    value = pin.value,
+                                    label = {
+                                        Text(text = "请输入NetWork")
+                                    },
+                                    onValueChange = { text ->
+                                        pin.value = text
+                                    })
+                            }
                         }
                         item {
                             TextButton(onClick = {
-                                if (pin.value.isEmpty()) {
-                                    pin.value = "12345678"
-                                }
-                                val p2pInfo = P2pInfo(
-                                    netWorkName.value, pin.value
-                                )
-                                viewModel.createNewGroup(p2pInfo)
-                                isCreate.value=false
+                                if (switchState) {
+                                    if (pin.value.isEmpty()) {
+                                        pin.value = "12345678"
+                                    }
+                                    val p2pInfo = P2pInfo(
+                                        netWorkName.value, pin.value
+                                    )
+                                    viewModel.createNewGroup(p2pInfo)
+                                    isCreate.value = false
 
-                                netWorkName.value = ""
-                                pin.value = ""
+                                    netWorkName.value = ""
+                                    pin.value = ""
+                                } else {
+                                    viewModel.createNewGroup()
+                                    isCreate.value = false
+
+                                }
+
 
                             }) {
                                 Text(text = "创建组")
                             }
                         }
                     }
-                }else{
+                } else {
                     Screen.lazyItem(it = it, viewModel = viewModel)
                 }
             } else {
-                ToastUtils.showShort("Android10以下默认创建组")
-                LogUtils.i("Android10以下默认创建组")
+                LaunchedEffect(Unit) {
+                    ToastUtils.showShort("Android10以下默认创建组")
+                    LogUtils.i("Android10以下默认创建组")
+                    viewModel.createNewGroup()
+                }
+
                 Screen.lazyItem(it, viewModel)
-                viewModel.createNewGroup()
             }
 
         }

@@ -16,7 +16,6 @@ object SenderFragment {
         viewModel: WifiP2pViewModel,
     ) {
         //表示不想成为组长
-        viewModel.owner == 0
         Scaffold(
             topBar = {
                 Screen.setTopBar(

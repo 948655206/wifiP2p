@@ -3,16 +3,22 @@ package com.android.wifip2pdemo.viewModel
 import android.app.Application
 import android.net.MacAddress
 import android.net.Uri
-import android.net.wifi.WifiInfo
 import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.*
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
+import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo
 import android.os.Build
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.android.wifip2pdemo.ui.compose.fragment.Constants.DISPLAY
+import com.android.wifip2pdemo.ui.compose.fragment.Constants.INVALID
+import com.android.wifip2pdemo.ui.compose.fragment.Constants.KEYPAD
+import com.android.wifip2pdemo.ui.compose.fragment.Constants.LABEL
+import com.android.wifip2pdemo.ui.compose.fragment.Constants.PBC
+import com.android.wifip2pdemo.ui.compose.fragment.Constants.PIN
 import com.android.wifip2pdemo.ui.compose.fragment.ReceiveFragment
 import com.android.wifip2pdemo.utils.MediaUtils
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.*
@@ -54,10 +60,13 @@ class WifiP2pViewModel(
 
     enum class ConnectState {
         FIRST_TIME,//首次进入
+        CONNECT_PREPARE,//准备选择...
         CONNECT_LOADING, //正在连接中...
         CONNECT_SUCCESS, //连接成功...
         CONNECT_DISCONNECT,//未连接..
+        CONNECT_FAILURE,//连接失败...
         CONNECT_CREATER,//组长
+        CONNECT_STOP,//连接结束
     }
 
 
@@ -117,7 +126,6 @@ class WifiP2pViewModel(
                     override fun onSuccess() {
                         LogUtils.i("删除组成功...")
                         createByInfo(info)
-//                        createGroup()
                     }
 
                     override fun onFailure(p0: Int) {
@@ -127,7 +135,6 @@ class WifiP2pViewModel(
                 })
             } else {
                 createByInfo(info)
-//                createGroup()
 
             }
         }
@@ -139,7 +146,7 @@ class WifiP2pViewModel(
             val wifiP2pConfig = WifiP2pConfig.Builder()
                 .setNetworkName(info.netWorkName)
                 .setPassphrase(info.pin)
-                .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
+                .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
                 .build()
 
             LogUtils.i("info.netWorkName==>${info.netWorkName}")
@@ -173,31 +180,24 @@ class WifiP2pViewModel(
 
     private fun createGroup() {
 
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-//            LogUtils.i("Android10以上创建组...")
-//
-//
-//        } else {
-            LogUtils.i("低版本创建组...")
-            manager?.apply {
-                createGroup(mChannel, object : WifiP2pManager.ActionListener {
-                    override fun onSuccess() {
-                        LogUtils.i("创建组成功...")
-                        receiveMessage()
-                        _connectState.postValue(CONNECT_CREATER)
+        LogUtils.i("低版本创建组...")
+        manager?.apply {
+            createGroup(mChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    LogUtils.i("创建组成功...")
+                    receiveMessage()
+                    _connectState.postValue(CONNECT_CREATER)
+                }
+
+                override fun onFailure(p0: Int) {
+                    LogUtils.e("创建组失败...$p0")
+                    if (p0 == 2) {
+                        removeGroup()
                     }
+                }
 
-                    override fun onFailure(p0: Int) {
-                        LogUtils.e("创建组失败...$p0")
-                        if (p0 == 2) {
-                            removeGroup()
-                        }
-                    }
-
-                })
-            }
-//        }
-
+            })
+        }
 
     }
 
@@ -214,82 +214,85 @@ class WifiP2pViewModel(
                         sockList.add(socket)
 
                         viewModelScope.launch(Dispatchers.IO) {
-                            val inputStream = socket.getInputStream()
-                            //通过protobuf 获取定义的文件信息
-                            //原理是protobuf设置长度，所以不会和后面信息混淆
-                            val fileConfig = FileConfig.Config.parseDelimitedFrom(inputStream)
+                            try {
+                                val inputStream = socket.getInputStream()
+                                //通过protobuf 获取定义的文件信息
+                                //原理是protobuf设置长度，所以不会和后面信息混淆
+                                val fileConfig = FileConfig.Config.parseDelimitedFrom(inputStream)
 
+                                when (fileConfig.type) {
+                                    FileConfig.Config.Type.FILE -> {
+                                        //以后可以优化 目前是单个socket接收一段信息 没有粘包问题
+                                        val fileSize = fileConfig.fileSize
+                                        //类型是文件
+                                        val savePath =
+                                            PathUtils.getExternalDownloadsPath() + "/" + fileConfig.fileName
+                                        LogUtils.i("存储路径==>$savePath")
 
-                            when (fileConfig.type) {
-                                FileConfig.Config.Type.FILE -> {
-                                    //以后可以优化 目前是单个socket接收一段信息 没有粘包问题
-                                    val fileSize = fileConfig.fileSize
-                                    //类型是文件
-                                    val savePath =
-                                        PathUtils.getExternalDownloadsPath() + "/" + fileConfig.fileName
-                                    LogUtils.i("存储路径==>$savePath")
-
-                                    val bufferedInputStream = BufferedInputStream(inputStream)
-                                    val file = File(savePath)
-                                    if (file.exists()) {
-                                        file.delete()
-                                    }
-                                    file.createNewFile()
-                                    val fileOutputStream = FileOutputStream(file)
-
-                                    //开始接收数据的时间
-                                    val startTime = System.currentTimeMillis()
-                                    var lastPrintTime = startTime
-
-                                    //每次接收的数据大小
-                                    var len = 0
-                                    //总接收的数据大小
-                                    var totalSize = 0
-
-                                    while (bufferedInputStream.read(buffer).also {
-                                            len = it
-                                            totalSize += len
-                                        } != -1) {
-                                        fileOutputStream.write(buffer, 0, len)
-                                        val currentTime = System.currentTimeMillis()
-                                        //总共耗时
-                                        val totalTime = currentTime - startTime
-                                        if ((currentTime - lastPrintTime) >= 2000) {
-                                            //每两秒打印一次接收速率
-                                            LogUtils.i("平均接收速率==>${totalSize * 8 / 1000000.0 / totalTime}Mbps")
-                                            lastPrintTime = currentTime
+                                        val bufferedInputStream = BufferedInputStream(inputStream)
+                                        val file = File(savePath)
+                                        if (file.exists()) {
+                                            file.delete()
                                         }
+                                        file.createNewFile()
+                                        val fileOutputStream = FileOutputStream(file)
+
+                                        //开始接收数据的时间
+                                        val startTime = System.currentTimeMillis()
+                                        var lastPrintTime = startTime
+
+                                        //每次接收的数据大小
+                                        var len = 0
+                                        //总接收的数据大小
+                                        var totalSize = 0
+
+                                        while (bufferedInputStream.read(buffer).also {
+                                                len = it
+                                                totalSize += len
+                                            } != -1) {
+                                            fileOutputStream.write(buffer, 0, len)
+                                            val currentTime = System.currentTimeMillis()
+                                            //总共耗时
+                                            val totalTime = (currentTime - startTime)/1000
+                                            if ((currentTime - lastPrintTime) >= 2000) {
+                                                //每两秒打印一次接收速率
+                                                LogUtils.i("平均接收速率==>${totalSize * 8 / 1000000.0 / totalTime}Mbps")
+                                                lastPrintTime = currentTime
+                                            }
+                                        }
+
+                                        //关闭流...
+                                        fileOutputStream.flush()
+                                        fileOutputStream.close()
+                                        socket.close()
                                     }
 
-                                    //关闭流...
-                                    fileOutputStream.flush()
-                                    fileOutputStream.close()
-                                    socket.close()
-                                }
+                                    FileConfig.Config.Type.TEXT -> {
+                                        val bufferedInputStream = BufferedInputStream(inputStream)
+                                        var len = 0
+                                        val stringBuilder = StringBuilder()
+                                        while (bufferedInputStream.read(buffer).also {
+                                                len = it
+                                            } != -1) {
+                                            val string = String(buffer, 0, len)
+                                            stringBuilder.append(string)
+                                        }
+                                        ToastUtils.showShort("收到消息了==>${stringBuilder.toString()}")
 
-                                FileConfig.Config.Type.TEXT -> {
-                                    val bufferedInputStream = BufferedInputStream(inputStream)
-                                    var len = 0
-                                    val stringBuilder = StringBuilder()
-                                    while (bufferedInputStream.read(buffer).also {
-                                            len = it
-                                        } != -1) {
-                                        val string = String(buffer, 0, len)
-                                        stringBuilder.append(string)
+                                        bufferedInputStream.close()
+                                        socket.close()
                                     }
-                                    ToastUtils.showShort("收到消息了==>${stringBuilder.toString()}")
-
-                                    bufferedInputStream.close()
-                                    socket.close()
+                                    FileConfig.Config.Type.UNRECOGNIZED -> {
+                                        LogUtils.i("收到未知文件流...")
+                                    }
                                 }
-                                FileConfig.Config.Type.UNRECOGNIZED -> {
-                                    LogUtils.i("收到未知文件流...")
-                                }
+                            }catch (e:Exception){
+                                LogUtils.e("出错了==>${e.toString()}")
                             }
+
 
                         }
                     } catch (e: Exception) {
-
                         LogUtils.e("socket出错==>${e.toString()}")
 
                     }
@@ -306,12 +309,70 @@ class WifiP2pViewModel(
 
     }
 
+    val serverListener=WifiP2pManager.DnsSdServiceResponseListener { inStanceName, serviceType, wifiP2pDevice ->
+        LogUtils.i("inStanceName==>$inStanceName")
+        LogUtils.i("serviceType==>$serviceType")
+        LogUtils.i("wifiP2pDevice==>${wifiP2pDevice.deviceAddress}")
+    }
+
+    fun createService(){
+        // 创建服务信息
+        val serviceInfo = WifiP2pDnsSdServiceInfo.newInstance("_my_service_type", "_tcp", mapOf("key" to "value"))
+
+        manager?.apply {
+            addLocalService(mChannel,serviceInfo,object :WifiP2pManager.ActionListener{
+                override fun onSuccess() {
+                    LogUtils.i("开启成功..")
+                    createGroup()
+                }
+
+                override fun onFailure(p0: Int) {
+                    LogUtils.e("开启失败..$p0")
+                }
+
+            })
+        }
+
+    }
+
+    // 添加服务请求
+    fun requestService() {
+        val serviceRequest = WifiP2pDnsSdServiceRequest.newInstance("_my_service_type", "_tcp")
+        manager?.apply {
+            addServiceRequest(mChannel,serviceRequest,object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    LogUtils.i( "Service request added successfully.")
+                    discoverServices(mChannel, object : WifiP2pManager.ActionListener {
+                        override fun onSuccess() {
+                            LogUtils.i( "Service discovery started successfully.")
+
+                        }
+
+                        override fun onFailure(reason: Int) {
+                            LogUtils.e("Failed to start service discovery. Reason: $reason")
+                        }
+                    })
+                }
+
+                override fun onFailure(reason: Int) {
+                    LogUtils.e("Failed to add service request. Reason: $reason")
+                }
+            })
+        }
+    }
+
+
+
     //移除组
     fun removeGroup() {
         manager?.removeGroup(mChannel, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 LogUtils.i("移除组成功...")
-                connectState.postValue(CONNECT_DISCONNECT)
+                    if (connectState.value==CONNECT_SUCCESS){
+                        connectState.postValue(CONNECT_PREPARE)
+                    }else{
+                        connectState.postValue(CONNECT_DISCONNECT)
+                    }
             }
 
             override fun onFailure(p0: Int) {
@@ -339,73 +400,143 @@ class WifiP2pViewModel(
         })
     }
 
+    private fun connect(config: WifiP2pConfig) {
+        _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+        manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+                ToastUtils.showShort("连接中...")
+                LogUtils.i("连接中...")
+                connectState.postValue(CONNECT_LOADING)
+
+
+            }
+
+            override fun onFailure(p0: Int) {
+                if (p0 == 2) {
+                    ToastUtils.showShort("已有连接建立，退出后重试")
+                } else {
+                    ToastUtils.showShort("连接失败...")
+                    LogUtils.e("连接失败==>$p0")
+                }
+            }
+
+        })
+    }
+
     //连接组
-    fun connect(device: WifiP2pDevice) {
+    fun connect(device: WifiP2pDevice, connectState: String, password: String) {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-
-            LogUtils.i("高Android10版本连接...")
-            val config = WifiP2pConfig.Builder()
-                .setPassphrase(pin)
-                .setNetworkName(netWorkName)
-                .setDeviceAddress(MacAddress.fromString(device.deviceAddress))
-                .build()
-
-            LogUtils.i("config.deviceAddress${config.deviceAddress}")
-            LogUtils.i("是否支持keyPad==>${device.wpsKeypadSupported()}")
-            LogUtils.i("是否支持DisPlayer==>${device.wpsDisplaySupported()}")
-            LogUtils.i("是否支持PBC==>${device.wpsPbcSupported()}")
-            LogUtils.i("device.describeContents()==>${device.describeContents()}")
-            LogUtils.i("device.primaryDeviceType==>${device.primaryDeviceType}")
-            LogUtils.i("device.secondaryDeviceType==>${device.secondaryDeviceType}")
-
-            manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
-                override fun onSuccess() {
-                    LogUtils.i("连接中....${owner}")
-                    LogUtils.i("连接中....${config.passphrase}")
-                    LogUtils.i("连接中....${config.wps.pin}")
-                    _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
-                    connectState.postValue(CONNECT_LOADING)
-                }
-
-                override fun onFailure(p0: Int) {
-                    LogUtils.i("连接失败...$p0")
-                    if (p0 == 2) {
-                        ToastUtils.showShort("已建立连接...")
-                        connectState.postValue(CONNECT_SUCCESS)
-                    }
-                }
-
-            })
-        } else {
-            LogUtils.i("低版本连接...")
-            val config = WifiP2pConfig()
-            config.deviceAddress = device.deviceAddress
-            config.wps.setup=WpsInfo.PBC
-            //是否想成为组长
-            config.groupOwnerIntent = owner
-
-
-            LogUtils.i("连接地址==>${config.deviceAddress}")
-            manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
-                override fun onSuccess() {
-                    LogUtils.i("连接中....${device.deviceName}")
-                    LogUtils.i("配置密码...${config.wps.pin}")
-                    LogUtils.i("是否为组员...${owner}")
-                    _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
-                    connectState.postValue(CONNECT_LOADING)
-                }
-
-                override fun onFailure(p0: Int) {
-                    LogUtils.i("连接失败...$p0")
-                    if (p0 == 2) {
-                        ToastUtils.showShort("已建立连接...")
-                        connectState.postValue(CONNECT_SUCCESS)
-                    }
-                }
-
-            })
+        val config = WifiP2pConfig()
+        config.deviceAddress = device.deviceAddress
+        config.wps.setup=WifiP2pConfig.GROUP_OWNER_BAND_5GHZ
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            LogUtils.i("工作信道==>${config.groupOwnerBand}")
         }
+
+        when (connectState) {
+            PBC -> {
+                LogUtils.i("PBC连接方式..")
+                config.wps.setup = WpsInfo.PBC
+            }
+            DISPLAY -> {
+                LogUtils.i("DISPLAY 连接方式..")
+                config.wps.setup = WpsInfo.DISPLAY
+            }
+            KEYPAD -> {
+                LogUtils.i("KEYPAD 连接方式..")
+                config.wps.setup = WpsInfo.KEYPAD
+            }
+            INVALID -> {
+                LogUtils.i("INVALID 连接方式..")
+                config.wps.setup = WpsInfo.INVALID
+            }
+            LABEL -> {
+                LogUtils.i("LABEL 连接方式..")
+                config.wps.setup = WpsInfo.LABEL
+            }
+            PIN -> {
+                LogUtils.i("PIN 连接方式..")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    connect(
+                        WifiP2pConfig.Builder()
+                            .setNetworkName(netWorkName)
+                            .setPassphrase(password)
+                            .setDeviceAddress(MacAddress.fromString(device.deviceAddress))
+                            .build()
+                    )
+                    return
+                } else {
+                    ToastUtils.showShort("连接失败,该方式只支持Android10以上的设备")
+                }
+            }
+        }
+        config.groupOwnerIntent = 0
+        connect(config)
+
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//
+//            LogUtils.i("高Android10版本连接...")
+//            val config = WifiP2pConfig.Builder()
+//                .setPassphrase(pin)
+//                .setNetworkName(netWorkName)
+//                .setDeviceAddress(MacAddress.fromString(device.deviceAddress))
+//                .build()
+//
+//            LogUtils.i("config.deviceAddress${config.deviceAddress}")
+//            LogUtils.i("是否支持keyPad==>${device.wpsKeypadSupported()}")
+//            LogUtils.i("是否支持DisPlayer==>${device.wpsDisplaySupported()}")
+//            LogUtils.i("是否支持PBC==>${device.wpsPbcSupported()}")
+//            LogUtils.i("device.describeContents()==>${device.describeContents()}")
+//            LogUtils.i("device.primaryDeviceType==>${device.primaryDeviceType}")
+//            LogUtils.i("device.secondaryDeviceType==>${device.secondaryDeviceType}")
+//
+//            manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
+//                override fun onSuccess() {
+//                    LogUtils.i("连接中....${owner}")
+//                    LogUtils.i("连接中....${config.passphrase}")
+//                    LogUtils.i("连接中....${config.wps.pin}")
+//                    _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+//                    connectState.postValue(CONNECT_LOADING)
+//                }
+//
+//                override fun onFailure(p0: Int) {
+//                    LogUtils.i("连接失败...$p0")
+//                    if (p0 == 2) {
+//                        ToastUtils.showShort("已建立连接...")
+//                        connectState.postValue(CONNECT_SUCCESS)
+//                    }
+//                }
+//
+//            })
+//        } else {
+//            LogUtils.i("低版本连接...")
+//            val config = WifiP2pConfig()
+//            config.deviceAddress = device.deviceAddress
+//            config.wps.setup = WpsInfo.PBC
+//            //是否想成为组长
+//            config.groupOwnerIntent = owner
+//
+//
+//            LogUtils.i("连接地址==>${config.deviceAddress}")
+//            manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
+//                override fun onSuccess() {
+//                    LogUtils.i("连接中....${device.deviceName}")
+//                    LogUtils.i("配置密码...${config.wps.pin}")
+//                    LogUtils.i("是否为组员...${owner}")
+//                    _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+//                    connectState.postValue(CONNECT_LOADING)
+//                }
+//
+//                override fun onFailure(p0: Int) {
+//                    LogUtils.i("连接失败...$p0")
+//                    if (p0 == 2) {
+//                        ToastUtils.showShort("已建立连接...")
+//                        connectState.postValue(CONNECT_SUCCESS)
+//                    }
+//                }
+//
+//            })
+//        }
 
     }
 
@@ -422,12 +553,13 @@ class WifiP2pViewModel(
                 CONNECT_DISCONNECT -> {
                     LogUtils.i("未连接组....")
                 }
-                FIRST_TIME -> {
-
-                }
-                else -> {
+                CONNECT_CREATER -> {
                     removeGroup()
                 }
+                CONNECT_SUCCESS->{
+                    removeGroup()
+                }
+                else->{}
             }
         } catch (e: Exception) {
             LogUtils.e("退出失败...$e")
@@ -440,30 +572,44 @@ class WifiP2pViewModel(
     }
 
     fun sendFileByUri(uri: Uri) {
+        LogUtils.i("发送数据...")
         manager?.requestConnectionInfo(mChannel) { info ->
             info.groupOwnerAddress?.let { address ->
                 viewModelScope.launch(Dispatchers.IO) {
                     val socket = Socket(address, port)
                     try {
                         //输出流
+                        LogUtils.i("发送数据...123")
                         val outputStream = socket.getOutputStream()
+                        LogUtils.i("发送数据...567")
 
-                        val filePath = MediaUtils.getRealPathFromUri(context, uri)
+                        var filePath = MediaUtils.getRealPathFromUri(context, uri)
+                        if (filePath.isNullOrEmpty()){
+                           filePath=uri.path
+                        }
+                        LogUtils.i("发送数据... 6666")
                         val fileName = FileUtils.getFileName(filePath)
-                        val fileType = FileUtils.getFileExtension(filePath)
-                        val fileLength = FileUtils.getFileLength(filePath)
+//                        LogUtils.i("发送数据... 1111")
+//                        val fileType = FileUtils.getFileExtension(filePath)
+//                        LogUtils.i("发送数据... 2222")
+//                        val fileLength = FileUtils.getFileLength(filePath)
+//                        LogUtils.i("发送数据...5888")
 
                         val openInputStream = context.contentResolver.openInputStream(uri)
-                        LogUtils.i("filePath==>$filePath")
-                        LogUtils.i("fileType==>$fileType")
+                        LogUtils.i("filePath==>${filePath}")
                         LogUtils.i("fileName==>$fileName")
-                        LogUtils.i("fileLength==>$fileLength")
+//                        LogUtils.i("fileType==>$fileType")
+//                        LogUtils.i("fileLength==>$fileLength")
 
                         //配置发送文件类型
                         val fileConfig = FileConfig.Config.newBuilder()
 
                         fileConfig.apply {
-                            this.fileName = fileName
+                            if (fileName.isEmpty()) {
+                                this.fileName="新文件.."
+                            }else{
+                                this.fileName =fileName
+                            }
                             this.type = FILE
                         }.build().writeDelimitedTo(outputStream)
 
@@ -490,7 +636,7 @@ class WifiP2pViewModel(
                             val currentTime = System.currentTimeMillis()
 
                             //总共花费时间
-                            var totalTime = currentTime - startTime
+                            var totalTime = (currentTime - startTime)/1000
                             if ((currentTime - lastPrintTime) >= 2000) {
                                 //每两秒打印一次传输速度
                                 LogUtils.i("平均发送速率==>${totalSize * 8 / 1000000.0 / totalTime}Mbps")
@@ -503,7 +649,7 @@ class WifiP2pViewModel(
                         socket.close()
                     } catch (e: Exception) {
                         socket.close()
-                        LogUtils.e("接收端socket出错==>${e.toString()}")
+                        LogUtils.e("发送端socket出错==>${e.toString()}")
                     }
 
                 }
@@ -572,6 +718,26 @@ class WifiP2pViewModel(
             }
         }
     }
+
+    fun removeClient(device: WifiP2pDevice) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+            manager?.removeClient(mChannel!!, MacAddress.fromString(device.deviceAddress),object :WifiP2pManager.ActionListener{
+                override fun onSuccess() {
+                    LogUtils.i("移除组员成功....")
+                }
+
+                override fun onFailure(p0: Int) {
+                    LogUtils.e("移除组员失败....")
+                }
+
+            })
+        }else{
+            LogUtils.i("不支持移除功能...")
+        }
+    }
+
+
 
 
 }

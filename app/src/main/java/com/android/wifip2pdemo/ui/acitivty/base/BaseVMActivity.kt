@@ -22,13 +22,13 @@ abstract class BaseVMActivity<VM : ViewModel>(private val viewModelClass: Class<
             this,ViewModelProvider.AndroidViewModelFactory(application)
         )[viewModelClass]
 
-        setEvent()
         supportActionBar?.let {
             it.hide()
         }
         setContent {
             setView()
         }
+        setEvent()
     }
 
     open fun setEvent() {

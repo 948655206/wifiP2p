@@ -13,8 +13,7 @@ import android.os.Parcelable
 import androidx.annotation.RequiresApi
 import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
-import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.CONNECT_CREATER
-import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.CONNECT_SUCCESS
+import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.*
 import com.android.wifip2pdemo.viewModel.WifiState
 import com.blankj.utilcode.util.LogUtils
 import java.io.File
@@ -60,7 +59,7 @@ class WiFiDirectBroadcastReceiver(
                 viewModel.setState(WifiState.WIFI_P2P_PEERS_CHANGED_ACTION)
                 manager.apply {
                     requestPeers(channel) { peers ->
-                        if (viewModel.chooseState.value == ChooseState.SENDER_FRAGMENT) {
+                        if (viewModel.connectState.value == CONNECT_PREPARE) {
                             viewModel.addPeer(peers.deviceList.toList())
                         }
                     }
@@ -88,13 +87,19 @@ class WiFiDirectBroadcastReceiver(
                             group?.let {
                                 LogUtils.i("组员==>${it.clientList.size}")
                                 viewModel.addPeer(it.clientList.toList())
-
+//                                LogUtils.i("信道==>${it.frequency}")
                             }
                         }
                     }
                     if (formed && !groupOwner) {
-                        //如果是组长
+                        //如果是组组员
                         viewModel.connectState.postValue(CONNECT_SUCCESS)
+                    }
+                    if (!formed){
+                        if (viewModel.connectState.value==CONNECT_SUCCESS) {
+                            //如果之前已经形成则是断开连接
+                            viewModel.connectState.postValue(WifiP2pViewModel.ConnectState.CONNECT_STOP)
+                        }
                     }
                 }
 

@@ -31,7 +31,6 @@ object MessageFragment {
             topBar = {
                 Screen.setTopBar(title = "文件传输页", back = {
                     navController.navigateUp()
-                    viewModel.disconnect()
                 })
             }
         ) {
@@ -82,7 +81,7 @@ object MessageFragment {
                                     "请在此输入内容"
                                 }, trailingIcon = {
                                     IconButton(onClick = {
-                                        LogUtils.i("发送图标...")
+                                        LogUtils.i("发送信息...")
                                         viewModel.sendText(text)
                                         text = ""
                                     }) {

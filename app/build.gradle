@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId "com.android.wifip2pdemo"
-        minSdk 24
+        minSdk 22
         targetSdk 33
         versionCode 1
         versionName "1.0"
