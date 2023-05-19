@@ -7,7 +7,6 @@ import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.*
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
-import android.net.wifi.p2p.nsd.WifiP2pServiceInfo
 import android.os.Build
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
@@ -428,7 +427,7 @@ class WifiP2pViewModel(
 
         val config = WifiP2pConfig()
         config.deviceAddress = device.deviceAddress
-        config.wps.setup=WifiP2pConfig.GROUP_OWNER_BAND_5GHZ
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             LogUtils.i("工作信道==>${config.groupOwnerBand}")
         }
@@ -457,6 +456,7 @@ class WifiP2pViewModel(
             PIN -> {
                 LogUtils.i("PIN 连接方式..")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    LogUtils.i("新连接方式...")
                     connect(
                         WifiP2pConfig.Builder()
                             .setNetworkName(netWorkName)
@@ -466,77 +466,13 @@ class WifiP2pViewModel(
                     )
                     return
                 } else {
-                    ToastUtils.showShort("连接失败,该方式只支持Android10以上的设备")
+                    LogUtils.i("旧版连接方式...")
+                    ToastUtils.showShort("连接失败")
                 }
             }
         }
         config.groupOwnerIntent = 0
         connect(config)
-
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-//
-//            LogUtils.i("高Android10版本连接...")
-//            val config = WifiP2pConfig.Builder()
-//                .setPassphrase(pin)
-//                .setNetworkName(netWorkName)
-//                .setDeviceAddress(MacAddress.fromString(device.deviceAddress))
-//                .build()
-//
-//            LogUtils.i("config.deviceAddress${config.deviceAddress}")
-//            LogUtils.i("是否支持keyPad==>${device.wpsKeypadSupported()}")
-//            LogUtils.i("是否支持DisPlayer==>${device.wpsDisplaySupported()}")
-//            LogUtils.i("是否支持PBC==>${device.wpsPbcSupported()}")
-//            LogUtils.i("device.describeContents()==>${device.describeContents()}")
-//            LogUtils.i("device.primaryDeviceType==>${device.primaryDeviceType}")
-//            LogUtils.i("device.secondaryDeviceType==>${device.secondaryDeviceType}")
-//
-//            manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
-//                override fun onSuccess() {
-//                    LogUtils.i("连接中....${owner}")
-//                    LogUtils.i("连接中....${config.passphrase}")
-//                    LogUtils.i("连接中....${config.wps.pin}")
-//                    _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
-//                    connectState.postValue(CONNECT_LOADING)
-//                }
-//
-//                override fun onFailure(p0: Int) {
-//                    LogUtils.i("连接失败...$p0")
-//                    if (p0 == 2) {
-//                        ToastUtils.showShort("已建立连接...")
-//                        connectState.postValue(CONNECT_SUCCESS)
-//                    }
-//                }
-//
-//            })
-//        } else {
-//            LogUtils.i("低版本连接...")
-//            val config = WifiP2pConfig()
-//            config.deviceAddress = device.deviceAddress
-//            config.wps.setup = WpsInfo.PBC
-//            //是否想成为组长
-//            config.groupOwnerIntent = owner
-//
-//
-//            LogUtils.i("连接地址==>${config.deviceAddress}")
-//            manager?.connect(mChannel, config, object : WifiP2pManager.ActionListener {
-//                override fun onSuccess() {
-//                    LogUtils.i("连接中....${device.deviceName}")
-//                    LogUtils.i("配置密码...${config.wps.pin}")
-//                    LogUtils.i("是否为组员...${owner}")
-//                    _chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
-//                    connectState.postValue(CONNECT_LOADING)
-//                }
-//
-//                override fun onFailure(p0: Int) {
-//                    LogUtils.i("连接失败...$p0")
-//                    if (p0 == 2) {
-//                        ToastUtils.showShort("已建立连接...")
-//                        connectState.postValue(CONNECT_SUCCESS)
-//                    }
-//                }
-//
-//            })
-//        }
 
     }
 
@@ -589,17 +525,10 @@ class WifiP2pViewModel(
                         }
                         LogUtils.i("发送数据... 6666")
                         val fileName = FileUtils.getFileName(filePath)
-//                        LogUtils.i("发送数据... 1111")
-//                        val fileType = FileUtils.getFileExtension(filePath)
-//                        LogUtils.i("发送数据... 2222")
-//                        val fileLength = FileUtils.getFileLength(filePath)
-//                        LogUtils.i("发送数据...5888")
 
                         val openInputStream = context.contentResolver.openInputStream(uri)
                         LogUtils.i("filePath==>${filePath}")
                         LogUtils.i("fileName==>$fileName")
-//                        LogUtils.i("fileType==>$fileType")
-//                        LogUtils.i("fileLength==>$fileLength")
 
                         //配置发送文件类型
                         val fileConfig = FileConfig.Config.newBuilder()

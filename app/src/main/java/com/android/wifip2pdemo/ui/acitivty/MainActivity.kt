@@ -11,11 +11,10 @@ import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.provider.MediaStore
 import androidx.compose.foundation.ScrollState.Companion.Saver
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.autoSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.navigation.compose.NavHost
@@ -99,7 +98,11 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         mChannel?.also { channel ->
             receiver = WiFiDirectBroadcastReceiver(manager, channel, viewModel)
         }
-
+        if (packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {
+            LogUtils.i("支持wifiP2p")
+        }else{
+            LogUtils.e("不支持wifiP2p")
+        }
         intentFilter = IntentFilter().apply {
             //设备状态变化
             addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
@@ -172,14 +175,23 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             }
 
             composable(SERVER_FRAGMENT) {
-                LaunchedEffect(Unit) {
-                    viewModel.createService()
+                var remember by remember {
+                    mutableStateOf(1)
+                }
+                LogUtils.i("SERVER_FRAGMENT123123==>$remember")
+                LogUtils.i("SERVER_FRAGMENT123123")
+
+                LaunchedEffect( Unit){
+                    LogUtils.i("SERVER_FRAGMENT")
+                }
+                TextButton(onClick = {
+                    remember+=1
+                }) {
+                    Text(text = "点击事件==>$remember")
                 }
             }
             composable(REQUEST_FRAGMENT) {
-                LaunchedEffect(Unit) {
-                    viewModel.requestService()
-                }
+
             }
         }
 
