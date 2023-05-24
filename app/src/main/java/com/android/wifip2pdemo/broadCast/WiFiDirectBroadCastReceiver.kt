@@ -3,6 +3,7 @@ package com.android.wifip2pdemo.broadCast
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.location.Address
 import android.net.NetworkInfo
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pGroup
@@ -16,7 +17,11 @@ import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.*
 import com.android.wifip2pdemo.viewModel.WifiState
 import com.blankj.utilcode.util.LogUtils
+import com.blankj.utilcode.util.NetworkUtils
 import java.io.File
+import java.net.InetAddress
+import java.net.NetworkInterface
+import javax.jmdns.impl.DNSRecord.IPv4Address
 
 
 /**
@@ -59,8 +64,16 @@ class WiFiDirectBroadcastReceiver(
                 viewModel.setState(WifiState.WIFI_P2P_PEERS_CHANGED_ACTION)
                 manager.apply {
                     requestPeers(channel) { peers ->
+                        val filterDevices=peers.deviceList.filter {device->
+                            device.deviceName=="zxy"
+                        }
                         if (viewModel.connectState.value == CONNECT_PREPARE) {
                             viewModel.addPeer(peers.deviceList.toList())
+                            peers.deviceList.forEach {peer->
+
+                                LogUtils.i("peer...${peer.deviceName}")
+
+                            }
                         }
                     }
                 }
@@ -85,11 +98,18 @@ class WiFiDirectBroadcastReceiver(
                         viewModel.connectState.postValue(CONNECT_CREATER)
                         manager.requestGroupInfo(channel) { group ->
                             group?.let {
-                                LogUtils.i("组员==>${it.clientList.size}")
+//                                LogUtils.i("组员==>${it.clientList.size}")
                                 viewModel.addPeer(it.clientList.toList())
+
+                                it.clientList.forEach {
+                                    LogUtils.i("mac地址==》${it.deviceAddress}")
+
+                                }
 //                                LogUtils.i("信道==>${it.frequency}")
                             }
                         }
+
+
                     }
                     if (formed && !groupOwner) {
                         //如果是组组员
@@ -115,5 +135,22 @@ class WiFiDirectBroadcastReceiver(
             }
 
         }
+    }
+
+
+    fun getIpAddressFromMacAddress(macAddress: String): String? {
+        val macBytes = macAddress.split(":", "-")
+            .map { it.toInt(16).toByte() }
+            .toByteArray()
+
+        val networkInterface = NetworkInterface.getByInetAddress(InetAddress.getByAddress(macBytes))
+
+        val addresses = networkInterface.inetAddresses
+        for (address in addresses) {
+            if (!address.isLoopbackAddress && address.hostAddress.indexOf(':') < 0) {
+                return address.hostAddress
+            }
+        }
+        return null
     }
 }

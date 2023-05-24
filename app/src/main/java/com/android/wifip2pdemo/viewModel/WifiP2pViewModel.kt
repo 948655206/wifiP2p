@@ -31,6 +31,8 @@ import fileConfig.FileConfig.Config.Type.TEXT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.*
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.ServerSocket
 import java.net.Socket
 
@@ -89,6 +91,33 @@ class WifiP2pViewModel(
         _peerList.postValue(devices)
     }
 
+    //7236
+    fun findIPByUdp(){
+        LogUtils.i("Udp监听...")
+        val port = 7236
+        val bufferSize = 1024
+
+        val socket = DatagramSocket(port)
+
+        val buffer = ByteArray(bufferSize)
+        val packet = DatagramPacket(buffer, buffer.size)
+
+        while (true) {
+            socket.receive(packet)
+
+            val receivedData = String(packet.data, packet.offset, packet.length)
+            val senderAddress = packet.address
+            val senderPort = packet.port
+
+            // 处理接收到的数据和发送方的信息
+            println("Received data: $receivedData")
+            println("Sender address: $senderAddress")
+            println("Sender port: $senderPort")
+
+            // 清空数据缓冲区
+            packet.data = ByteArray(bufferSize)
+        }
+    }
     fun createNewGroup() {
         //为了防止已经有组创建，删除之前的组，重新创建
         manager?.requestGroupInfo(
@@ -148,8 +177,11 @@ class WifiP2pViewModel(
                 .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
                 .build()
 
+
+
             LogUtils.i("info.netWorkName==>${info.netWorkName}")
             LogUtils.i("info.pin==>${info.pin}")
+
 
             manager?.apply {
                 LogUtils.i("Android10以上创建组...")
@@ -185,6 +217,7 @@ class WifiP2pViewModel(
                 override fun onSuccess() {
                     LogUtils.i("创建组成功...")
                     receiveMessage()
+
                     _connectState.postValue(CONNECT_CREATER)
                 }
 
@@ -591,6 +624,7 @@ class WifiP2pViewModel(
             info.groupOwnerAddress?.let { address ->
                 viewModelScope.launch(Dispatchers.IO) {
                     val socket = Socket(address, port)
+
                     try {
                         //输出流
                         val outputStream = socket.getOutputStream()

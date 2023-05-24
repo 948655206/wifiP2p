@@ -4,17 +4,48 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+
+
 android {
     namespace 'com.android.wifip2pdemo'
+//    compileSdk 28
     compileSdk 33
 
     buildFeatures{
         compose true
     }
 
+
+    flavorDimensions "platform" //为产品增加变体
+
+    signingConfigs {//签名配置 用来存放签名包
+        RK3568 {
+            storeFile file(KEY_STORE_3568_FILE) //这里为签名包的存放路径
+            storePassword 'android' //证书文件密码
+            keyAlias 'android'	//别名为android，标识证书中的私钥
+            keyPassword 'android'	//android别名对应的私钥的密码
+        }
+    }
+
+    productFlavors {
+        pt{
+
+        }
+        //这里可以存放 不同的签名
+//        FileManagerRK3568 {
+//            //里面可以 根据版本的不同 设置不同的属性
+//            dimension "platform" //变体
+//            signingConfig signingConfigs.RK3568 //对应产品应用到的签名
+//            minSdkVersion 26
+//        }
+
+
+    }
+
     defaultConfig {
         applicationId "com.android.wifip2pdemo"
         minSdk 22
+//        targetSdk 28
         targetSdk 33
         versionCode 1
         versionName "1.0"
@@ -23,8 +54,14 @@ android {
     }
 
     buildTypes {
+        debug {
+//            signingConfig signingConfigs.RK3568 //对应产品应用到的签名
+
+        }
+
+
         release {
-            minifyEnabled false
+            minifyEnabled false  //是否混淆
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -59,6 +96,10 @@ protobuf {
 }
 
 dependencies {
+    def master_snapshot="0.1.5"
+
+    //反射框架
+    implementation "com.github.zeshaoaaa:OkReflect:$master_snapshot"
 
     //将protobuf 转换成java格式
     implementation 'com.google.protobuf:protobuf-java:3.23.0'
@@ -88,4 +129,9 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    implementation 'org.jmdns:jmdns:3.5.4'
+    implementation 'org.slf4j:slf4j-api:1.7.32'
+    implementation 'org.slf4j:slf4j-simple:1.7.32'  // 选择合适的实现库，如 slf4j-simple、slf4j-logback、slf4j-log4j 等
+
 }

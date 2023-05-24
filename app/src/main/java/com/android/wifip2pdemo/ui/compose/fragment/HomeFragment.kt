@@ -53,11 +53,11 @@ object HomeFragment {
                         Text(text = "创建服务")
                     }
 
-                    TextButton(onClick = {
-                        navController.navigate(Screen.REQUEST_FRAGMENT)
-                    }) {
-                        Text(text = "请求服务")
-                    }
+//                    TextButton(onClick = {
+//                        navController.navigate(Screen.REQUEST_FRAGMENT)
+//                    }) {
+//                        Text(text = "请求服务")
+//                    }
                 }
             },
         )
