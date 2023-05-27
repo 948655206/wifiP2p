@@ -45,6 +45,15 @@ object MessageFragment {
                         CircularProgressIndicator()
                     }
                 }
+                WifiP2pViewModel.ConnectState.CONNECT_CREATER->{
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "我是组长！")
+                    }
+                }
                 else -> {
                     val density = LocalDensity.current
                     var isVisible by remember {

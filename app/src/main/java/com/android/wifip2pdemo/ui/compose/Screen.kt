@@ -1,6 +1,7 @@
 package com.android.wifip2pdemo.ui.compose
 
 import android.net.wifi.p2p.WifiP2pDevice
+import android.os.UidProto.Wifi
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +25,7 @@ import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.*
 import com.blankj.utilcode.util.LogUtils
+import com.blankj.utilcode.util.ToastUtils
 
 @Suppress("TODO")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,7 +35,7 @@ object Screen {
     const val RECEIVER_FRAGMENT = "RECEIVER"
     const val MESSAGE_FRAGMENT = "MESSAGE"
     const val SERVER_FRAGMENT="SERVER_CREATED"
-    const val REQUEST_FRAGMENT="REQUEST_CREATED"
+    const val FIND_MIRACAST="REQUEST_CREATED"
 
 
     @Composable
@@ -133,7 +135,9 @@ object Screen {
                 confirmButton = {
                     TextButton(onClick = {
                         viewModel.connect(chooseDevice!!,connectState,password)
-                        viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+                        if (viewModel.connectState.value!=CONNECT_CREATER) {
+                            viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
+                        }
                         showDialog=false
                     }) {
                         Text(text = "连接")
@@ -163,14 +167,24 @@ object Screen {
                 items(listState) { device ->
                     TextButton(
                         onClick = {
-                            if (viewModel.connectState.value == CONNECT_PREPARE ||viewModel.connectState.value==CONNECT_DISCONNECT) {
-                                chooseDevice = device
-                                showDialog = true
-                            } else if (viewModel.connectState.value==CONNECT_CREATER) {
-                                viewModel.removeClient(device)
-                            }else{
-                                LogUtils.i("该条目被点击了...")
+//                                  viewModel.connect(device, PBC,password)
 
+                            LogUtils.i("设备状态==>${device.status}")
+                            when (device.status) {
+                                WifiP2pDevice.AVAILABLE -> {
+                                    chooseDevice = device
+                                    showDialog = true
+                                }
+                                WifiP2pDevice.CONNECTED->{
+                                    ToastUtils.showShort("该设备已经连接，请勿重复连接")
+                                }
+                                WifiP2pDevice.INVITED->{
+                                    ToastUtils.showShort("该设备已经连接，正在邀请中..")
+                                }
+                                else -> {
+                                    ToastUtils.showShort("连接发生意外了...")
+                                    LogUtils.e("连接发生意外了...$")
+                                }
                             }
 
                         }, modifier = Modifier

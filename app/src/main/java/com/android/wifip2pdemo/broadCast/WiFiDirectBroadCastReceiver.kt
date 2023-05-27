@@ -5,13 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.location.Address
 import android.net.NetworkInfo
-import android.net.wifi.p2p.WifiP2pDevice
-import android.net.wifi.p2p.WifiP2pGroup
-import android.net.wifi.p2p.WifiP2pInfo
-import android.net.wifi.p2p.WifiP2pManager
+import android.net.wifi.p2p.*
 import android.os.Build
 import android.os.Parcelable
 import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat.getSystemService
 import com.android.wifip2pdemo.viewModel.ChooseState
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.*
@@ -58,21 +56,30 @@ class WiFiDirectBroadcastReceiver(
             WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
                 // Check to see if Wi-Fi is enabled and notify appropriate activity
                 LogUtils.i("123状态改变...")
+                val state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1)
+                if (state == WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
+                    // Wi-Fi Direct (P2P)已启用
+                    LogUtils.i("Wi-Fi Direct (P2P)已启用...")
+
+                } else {
+                    // Wi-Fi Direct (P2P)已禁用
+                    LogUtils.e("Wi-Fi Direct (P2P)已禁用")
+                }
+
             }
+
             WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
                 // Call WifiP2pManager.requestPeers() to get a list of current peers
                 viewModel.setState(WifiState.WIFI_P2P_PEERS_CHANGED_ACTION)
+
                 manager.apply {
+
                     requestPeers(channel) { peers ->
-                        val filterDevices=peers.deviceList.filter {device->
-                            device.deviceName=="zxy"
-                        }
-                        if (viewModel.connectState.value == CONNECT_PREPARE) {
-                            viewModel.addPeer(peers.deviceList.toList())
-                            peers.deviceList.forEach {peer->
+                        viewModel.addPeer(peers.deviceList.toList())
 
-                                LogUtils.i("peer...${peer.deviceName}")
-
+                        if (peers.deviceList.isNotEmpty()) {
+                            peers.deviceList.forEach {device->
+                                LogUtils.i("当前设备状态==>${device.deviceName}....${device.status}")
                             }
                         }
                     }
@@ -82,7 +89,6 @@ class WiFiDirectBroadcastReceiver(
                 // Respond to new connection or disconnections
                 viewModel.setState(WifiState.WIFI_P2P_CONNECTION_CHANGED_ACTION)
                 LogUtils.i("连接状态改变...")
-
 
                 manager.requestConnectionInfo(channel) { info ->
                     val address = info.groupOwnerAddress
@@ -98,13 +104,15 @@ class WiFiDirectBroadcastReceiver(
                         viewModel.connectState.postValue(CONNECT_CREATER)
                         manager.requestGroupInfo(channel) { group ->
                             group?.let {
-//                                LogUtils.i("组员==>${it.clientList.size}")
-                                viewModel.addPeer(it.clientList.toList())
+                                LogUtils.i("组员==>${it.clientList.size}")
 
-                                it.clientList.forEach {
-                                    LogUtils.i("mac地址==》${it.deviceAddress}")
+                                viewModel.discoverPeers()
 
-                                }
+//                                viewModel.addPeer(it.clientList.toList())
+
+//                                it.clientList.forEach {
+//                                    LogUtils.i("mac地址==》${it.deviceAddress}")
+//                                }
 //                                LogUtils.i("信道==>${it.frequency}")
                             }
                         }

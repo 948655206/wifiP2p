@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import com.android.wifip2pdemo.ui.compose.Screen
-import com.blankj.utilcode.util.LogUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 object HomeFragment {
@@ -53,11 +52,11 @@ object HomeFragment {
                         Text(text = "创建服务")
                     }
 
-//                    TextButton(onClick = {
-//                        navController.navigate(Screen.REQUEST_FRAGMENT)
-//                    }) {
-//                        Text(text = "请求服务")
-//                    }
+                    TextButton(onClick = {
+                        navController.navigate(Screen.FIND_MIRACAST)
+                    }) {
+                        Text(text = "在Miracast中发现")
+                    }
                 }
             },
         )

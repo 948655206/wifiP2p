@@ -5,6 +5,10 @@ import android.net.wifi.WifiInfo
 import android.net.wifi.WpsInfo
 import android.net.wifi.WpsInfo.DISPLAY
 import android.net.wifi.WpsInfo.PBC
+import android.net.wifi.p2p.WifiP2pConfig
+import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pGroup
+import android.net.wifi.p2p.WifiP2pWfdInfo
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -28,6 +32,24 @@ object ReceiveFragment {
 
     private const val pin = "12345678"
     private val netWorkName = "DIRECT-xy-zxy"
+
+//    @Composable
+//    fun receiverFragment(
+//        navController: NavHostController,
+//        viewModel: WifiP2pViewModel,
+//    ) {
+//        //表示不想成为组长
+//        Scaffold(
+//            topBar = {
+//                Screen.setTopBar(
+//                    title = "接收端",
+//                    back = { navController.navigateUp() }
+//                )
+//            }) {
+//
+//            Screen.lazyItem(it, viewModel)
+//        }
+//    }
 
     @SuppressLint("UnrememberedMutableState")
     @Composable
@@ -150,4 +172,5 @@ object ReceiveFragment {
     ) {
 
     }
+
 }

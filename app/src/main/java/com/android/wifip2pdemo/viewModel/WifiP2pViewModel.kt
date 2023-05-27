@@ -37,7 +37,7 @@ import java.net.ServerSocket
 import java.net.Socket
 
 class WifiP2pViewModel(
-    private val context: Application
+    open val context: Application
 ) : AndroidViewModel(context) {
 
     //连接状态
@@ -85,6 +85,7 @@ class WifiP2pViewModel(
     }
 
     fun addPeer(deviceList: List<WifiP2pDevice>) {
+
         println("加入addPeer==>${deviceList.size}")
         val devices = mutableListOf<WifiP2pDevice>()
         devices.addAll(deviceList)
@@ -193,7 +194,6 @@ class WifiP2pViewModel(
                         LogUtils.i("组长配置==>${wifiP2pConfig.groupOwnerIntent}")
                         LogUtils.i("组长配置==>${wifiP2pConfig.wps.setup}")
                         receiveMessage()
-                        _connectState.postValue(CONNECT_CREATER)
                     }
 
                     override fun onFailure(p0: Int) {
@@ -217,8 +217,6 @@ class WifiP2pViewModel(
                 override fun onSuccess() {
                     LogUtils.i("创建组成功...")
                     receiveMessage()
-
-                    _connectState.postValue(CONNECT_CREATER)
                 }
 
                 override fun onFailure(p0: Int) {
@@ -438,8 +436,9 @@ class WifiP2pViewModel(
             override fun onSuccess() {
                 ToastUtils.showShort("连接中...")
                 LogUtils.i("连接中...")
-                connectState.postValue(CONNECT_LOADING)
-
+                if (connectState.value!=CONNECT_CREATER) {
+                    connectState.postValue(CONNECT_LOADING)
+                }
 
             }
 
@@ -457,13 +456,11 @@ class WifiP2pViewModel(
 
     //连接组
     fun connect(device: WifiP2pDevice, connectState: String, password: String) {
-
+        LogUtils.i("owner==>$owner")
         val config = WifiP2pConfig()
         config.deviceAddress = device.deviceAddress
+        config.groupOwnerIntent=0
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            LogUtils.i("工作信道==>${config.groupOwnerBand}")
-        }
 
         when (connectState) {
             PBC -> {
@@ -504,7 +501,6 @@ class WifiP2pViewModel(
                 }
             }
         }
-        config.groupOwnerIntent = 0
         connect(config)
 
     }
@@ -700,7 +696,18 @@ class WifiP2pViewModel(
         }
     }
 
+    fun discoverPeers() {
+        manager?.discoverPeers(mChannel,object :WifiP2pManager.ActionListener{
+            override fun onSuccess() {
+                LogUtils.i("开始搜索成功。。。。")
+            }
 
+            override fun onFailure(reason: Int) {
+                LogUtils.e("开始搜索失败。。。。$reason")
+            }
+
+        })
+    }
 
 
 }
