@@ -1,7 +1,6 @@
 package com.android.wifip2pdemo.ui.compose
 
 import android.net.wifi.p2p.WifiP2pDevice
-import android.os.UidProto.Wifi
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +35,7 @@ object Screen {
     const val MESSAGE_FRAGMENT = "MESSAGE"
     const val SERVER_FRAGMENT="SERVER_CREATED"
     const val FIND_MIRACAST="REQUEST_CREATED"
-
+    const val FIND_AIRPLAY="FIND_AIRPLAY"
 
     @Composable
     fun setTopBar(

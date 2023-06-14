@@ -113,7 +113,7 @@ class WiFiDirectBroadcastReceiver(
 //                                it.clientList.forEach {
 //                                    LogUtils.i("mac地址==》${it.deviceAddress}")
 //                                }
-//                                LogUtils.i("信道==>${it.frequency}")
+                                LogUtils.i("信道==>${it.frequency}")
                             }
                         }
 

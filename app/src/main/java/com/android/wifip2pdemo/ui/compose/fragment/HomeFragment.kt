@@ -57,6 +57,12 @@ object HomeFragment {
                     }) {
                         Text(text = "在Miracast中发现")
                     }
+
+                    TextButton(onClick = {
+                        navController.navigate(Screen.FIND_AIRPLAY)
+                    }) {
+                        Text(text = "在AirPlay中发现")
+                    }
                 }
             },
         )

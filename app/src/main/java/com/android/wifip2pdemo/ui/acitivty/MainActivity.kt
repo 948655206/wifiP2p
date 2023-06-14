@@ -1,14 +1,14 @@
 package com.android.wifip2pdemo.ui.acitivty
 
 import android.Manifest
-import android.annotation.SuppressLint
+import android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.hardware.display.DisplayManager
-import android.hardware.display.WifiDisplay
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
@@ -17,7 +17,8 @@ import android.net.wifi.p2p.WifiP2pWfdInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
 import android.os.Build
-import androidx.annotation.RequiresApi
+import android.os.ServiceManager
+import android.os.SystemPropertiesProto.Log
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.navigation.compose.NavHost
@@ -25,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.android.wifip2pdemo.broadCast.WiFiDirectBroadcastReceiver
 import com.android.wifip2pdemo.ui.acitivty.base.BaseVMActivity
+import com.android.wifip2pdemo.ui.compose.Screen.FIND_AIRPLAY
 import com.android.wifip2pdemo.ui.compose.Screen.HOME_FRAGMENT
 import com.android.wifip2pdemo.ui.compose.Screen.MESSAGE_FRAGMENT
 import com.android.wifip2pdemo.ui.compose.Screen.RECEIVER_FRAGMENT
@@ -42,7 +44,6 @@ import com.blankj.utilcode.util.DeviceUtils
 import com.blankj.utilcode.util.LogUtils
 import com.blankj.utilcode.util.ToastUtils
 import com.hjq.permissions.XXPermissions
-import java.util.*
 
 
 class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.java) {
@@ -66,9 +67,9 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         if (wifiManager.isWifiEnabled) {
             LogUtils.i("WiFi已经开启")
-        }else{
+        } else {
             LogUtils.e("WiF未开启")
-            wifiManager.isWifiEnabled=true
+            wifiManager.isWifiEnabled = true
 
         }
 
@@ -88,7 +89,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             Manifest.permission.ACCESS_WIFI_STATE,
             Manifest.permission.CHANGE_WIFI_STATE,
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            ACCESS_BACKGROUND_LOCATION,
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
         )
 
@@ -105,8 +106,6 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
         } else {
             LogUtils.i("全部授予权限了...")
         }
-
-
 
 
 
@@ -165,9 +164,9 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                 )
 
                 LaunchedEffect(Unit) {
-                    viewModel.owner=0
+                    viewModel.owner = 0
                     viewModel.disconnect()
-                    manager.discoverServices(mChannel,object :WifiP2pManager.ActionListener{
+                    manager.discoverPeers(mChannel, object : WifiP2pManager.ActionListener {
                         override fun onSuccess() {
                             LogUtils.i("开始搜索成功。。。。")
                         }
@@ -186,8 +185,8 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                     navController,
                     viewModel
                 )
-                LaunchedEffect(Unit){
-                    viewModel.owner=15
+                LaunchedEffect(Unit) {
+                    viewModel.owner = 15
                     viewModel.connectState.postValue(CONNECT_PREPARE)
 
                 }
@@ -211,6 +210,229 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                 viewModel.chooseState.postValue(ChooseState.MESSAGE_FRAGMENT)
             }
 
+            composable(FIND_AIRPLAY) {
+
+
+                //airplay发现p2p设备 还未实现
+                val SERVICE_TYPE_AIRPLAY = "_airplay._tcp"
+                val SERVICE_TYPE_RAOP = "_raop._tcp"
+                val MAC_DEVICE = DeviceUtils.getMacAddress().replace(":", "")
+                val inStanceName = "zxyTv"
+
+//                val nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
+//                nsdManager.registerService(NsdServiceInfo().apply {
+//                    serviceName = "zxyTv"
+//                    serviceType = SERVICE_TYPE_AIRPLAY
+//                    port = 5353
+//                    mapOf(
+//                        "rmodel" to "coolbuild1,0",
+//                        "srcvers" to "220.68",
+//                        "deviceid" to DeviceUtils.getMacAddress(),
+//                        "features" to "0x5A7FEFF0",
+//                        "model" to "AppleTV3, 2",
+//                        "flags" to "0x4",
+//                        "pk" to "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29",
+//                        "pi" to "12345678-9abc-def0-0000-2e0547f4a307",
+//                        "psi" to "12345678-9abc-def0-0000-2e0547f4a307",
+//                        "vv" to "2",
+//                    ).forEach { it ->
+//                        setAttribute(it.key, it.value)
+//                    }
+//                },
+//                    NsdManager.PROTOCOL_DNS_SD,
+//                    object : NsdManager.RegistrationListener {
+//                        override fun onRegistrationFailed(
+//                            serviceInfo: NsdServiceInfo?,
+//                            errorCode: Int
+//                        ) {
+//                            LogUtils.i("11111111")
+//                        }
+//
+//                        override fun onUnregistrationFailed(
+//                            serviceInfo: NsdServiceInfo?,
+//                            errorCode: Int
+//                        ) {
+//                            LogUtils.i("222222")
+//                        }
+//
+//                        override fun onServiceRegistered(serviceInfo: NsdServiceInfo?) {
+//                            LogUtils.i("33333333")
+//                        }
+//
+//                        override fun onServiceUnregistered(serviceInfo: NsdServiceInfo?) {
+//                            LogUtils.i("44444444")
+//                        }
+//
+//                    })
+//                nsdManager.discoverServices(
+//                    SERVICE_TYPE_AIRPLAY,
+//                    NsdManager.PROTOCOL_DNS_SD,
+//                    object : NsdManager.DiscoveryListener {
+//                        override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) {
+//                            LogUtils.e("开启失败...")
+//                        }
+//
+//                        override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) {
+//                            LogUtils.e("开启失败...")
+//                        }
+//
+//                        override fun onDiscoveryStarted(serviceType: String?) {
+//                            LogUtils.i("1231123")
+//
+//                        }
+//
+//                        override fun onDiscoveryStopped(serviceType: String?) {
+//                            LogUtils.i("1231123")
+//
+//                        }
+//
+//                        override fun onServiceFound(serviceInfo: NsdServiceInfo?) {
+//                            LogUtils.i("发现设备了....")
+//                            nsdManager.resolveService(serviceInfo,
+//                                object : NsdManager.ResolveListener {
+//                                    override fun onResolveFailed(
+//                                        serviceInfo: NsdServiceInfo?,
+//                                        errorCode: Int
+//                                    ) {
+//                                        LogUtils.e("发送设备失败...$errorCode")
+//                                    }
+//
+//                                    override fun onServiceResolved(serviceInfo: NsdServiceInfo?) {
+//                                        LogUtils.i("设备发现成功==>${serviceInfo?.serviceName}")
+//                                    }
+//
+//                                })
+//                        }
+//
+//                        override fun onServiceLost(serviceInfo: NsdServiceInfo?) {
+//                            LogUtils.i("1231123")
+//                        }
+//
+//                    }
+//                )
+
+                val airplayInfo = WifiP2pDnsSdServiceInfo.newInstance(
+                    inStanceName + "." + SERVICE_TYPE_AIRPLAY,
+                    SERVICE_TYPE_AIRPLAY,
+                    mapOf(
+                        "rmodel" to "coolbuild1,0",
+                        "srcvers" to "220.68",
+                        "deviceid" to DeviceUtils.getMacAddress(),
+                        "features" to "0x5A7FEFF0",
+                        "model" to "AppleTV3, 2",
+                        "flags" to "0x4",
+                        "pk" to "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29",
+                        "pi" to "12345678-9abc-def0-0000-2e0547f4a307",
+                        "psi" to "12345678-9abc-def0-0000-2e0547f4a307",
+                        "vv" to "2",
+                    )
+                )
+
+//                val raopInfo = WifiP2pDnsSdServiceInfo.newInstance(
+//                    MAC_DEVICE + "@" + inStanceName + "." + SERVICE_TYPE_RAOP,
+//                    SERVICE_TYPE_RAOP,
+//                    mapOf(
+//                        "txtvers" to "1",
+//                        "ch" to "2",
+//                        "cn" to "0,3",
+//                        "et" to "0,3,5",
+//                        "sv" to "false",
+//                        "da" to "true",
+//                        "sr" to "44100",
+//                        "ss" to "16",
+//                        "pw" to "false",
+//                        "vn" to "3",
+//                        "tp" to "UDP",
+//                        "md" to "0,1,2",
+//                        "vs" to "130.1",
+//                        "sm" to "false",
+//                        "ek" to "1",
+//                        "sf" to "0x4",
+//                        "am" to "KUV,1",
+//                        "pk" to "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29",
+//                    )
+//
+//                )
+
+
+                manager.apply {
+                    setDnsSdResponseListeners(mChannel,  object :WifiP2pManager.DnsSdServiceResponseListener{
+                        override fun onDnsSdServiceAvailable(
+                            instanceName: String?,
+                            registrationType: String?,
+                            srcDevice: WifiP2pDevice?
+                        ) {
+                            LogUtils.i("DNS收到信息了...==>${srcDevice?.deviceName}")
+                        }
+
+                    }) { _, _, srcDevice ->
+                        LogUtils.i("DNS收到信息了...==>${srcDevice.deviceName}")
+
+                    }
+                    addLocalService(mChannel, airplayInfo, object : WifiP2pManager.ActionListener {
+                        override fun onSuccess() {
+                            LogUtils.i("添加成功${inStanceName + "." + SERVICE_TYPE_AIRPLAY}")
+
+                        }
+
+                        override fun onFailure(reason: Int) {
+                            LogUtils.e("添加失败....$reason")
+                        }
+
+                    })
+//                    addLocalService(mChannel, raopInfo, object : WifiP2pManager.ActionListener {
+//                        override fun onSuccess() {
+//                            LogUtils.i("添加成功${MAC_DEVICE + "@" + inStanceName + "." + SERVICE_TYPE_RAOP}")
+//
+//                        }
+//
+//                        override fun onFailure(reason: Int) {
+//                            LogUtils.e("添加失败....$reason")
+//                        }
+//
+//                    })
+
+                    addServiceRequest(mChannel,
+                        WifiP2pDnsSdServiceRequest.newInstance(), object : WifiP2pManager.ActionListener {
+                            override fun onSuccess() {
+                                LogUtils.i("添加成功...")
+
+                            }
+
+                            override fun onFailure(reason: Int) {
+                                LogUtils.e("添加失败...$reason")
+                            }
+
+                        })
+                    discoverServices(mChannel, object : WifiP2pManager.ActionListener {
+                        override fun onSuccess() {
+                            LogUtils.i("搜索服务成功..")
+
+                        }
+
+                        override fun onFailure(reason: Int) {
+                            LogUtils.e("搜索服务失败..$reason")
+                        }
+
+                    })
+                    setServiceResponseListener(mChannel,
+                        object : WifiP2pManager.ServiceResponseListener {
+                            override fun onServiceAvailable(
+                                protocolType: Int,
+                                responseData: ByteArray?,
+                                srcDevice: WifiP2pDevice?
+                            ) {
+                                LogUtils.i("收到服务回调了==>${srcDevice?.deviceName}")
+                            }
+
+                        })
+
+
+                }
+
+                LogUtils.i("启动了...==>")
+            }
+
             composable(SERVER_FRAGMENT) {
                 LogUtils.i("SERVER_FRAGMENT")
 
@@ -219,76 +441,6 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         LogUtils.i("android11以上设备，MIRACAST_SOURCE")
 
-//                        //airplay发现p2p设备 还未实现
-//                        val SERVICE_TYPE_AIRPLAY="_airplay._tcp"
-//                        val serviceInfo = WifiP2pDnsSdServiceInfo.newInstance(
-//                            "zxyTv",SERVICE_TYPE_AIRPLAY ,
-//                            mapOf(
-//                                "srcvers" to "220.68",
-//                                "deviceid" to DeviceUtils.getMacAddress(),
-//                                "features" to "0X527FFFF7,0x1E",
-//                                "model" to "AppleTV3,2",
-//                                "flags" to "0x4",
-//                                "pk" to "11c18e46fcd95587a70c9bd6e4a64a593c789cdd14c0ec8318d2651b43290eaa",
-//                                "vv" to "2",
-//                                "am" to "AndroidTV3,1",
-//                            )
-//                        )
-//
-//
-//
-//                        manager.apply {
-//                            addLocalService(mChannel,serviceInfo,object :WifiP2pManager.ActionListener{
-//                                override fun onSuccess() {
-//                                    LogUtils.i("添加成功....")
-//
-//                                }
-//
-//                                override fun onFailure(reason: Int) {
-//                                    LogUtils.e("添加失败....$reason")
-//                                }
-//
-//                            })
-//
-//                            manager.addServiceRequest(mChannel, WifiP2pDnsSdServiceRequest.newInstance(
-//                                WifiP2pDnsSdServiceInfo.SERVICE_TYPE_UPNP
-//                            ),object :WifiP2pManager.ActionListener{
-//                                override fun onSuccess() {
-//                                    LogUtils.i("添加成功...")
-//                                    discoverServices(mChannel,object :WifiP2pManager.ActionListener{
-//                                        override fun onSuccess() {
-//                                            LogUtils.i("搜索服务成功..")
-//
-//                                        }
-//
-//                                        override fun onFailure(reason: Int) {
-//                                            LogUtils.e("搜索服务失败..$reason")
-//                                        }
-//
-//                                    })
-//                                }
-//
-//                                override fun onFailure(reason: Int) {
-//                                    LogUtils.e("添加失败...$reason")
-//                                }
-//
-//                            })
-//
-//                            manager.setServiceResponseListener(mChannel,object :WifiP2pManager.ServiceResponseListener{
-//                                override fun onServiceAvailable(
-//                                    protocolType: Int,
-//                                    responseData: ByteArray?,
-//                                    srcDevice: WifiP2pDevice?
-//                                ) {
-//                                    LogUtils.i("收到信息了...${srcDevice?.deviceName}")
-//                                }
-//
-//                            })
-//
-//
-//                        }
-//
-//                        LogUtils.i("启动了...==>")
 
                         //让miracast中发现 p2p设备
                         val wifiP2pWfdInfo = WifiP2pWfdInfo()
@@ -296,7 +448,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                         wifiP2pWfdInfo.apply {
                             isEnabled = true
                             deviceType = WifiP2pWfdInfo.DEVICE_TYPE_PRIMARY_SINK
-                            isSessionAvailable=true
+                            isSessionAvailable = true
                         }
 
                         manager.setWfdInfo(mChannel!!, wifiP2pWfdInfo,
@@ -341,16 +493,19 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
                         deviceType = WifiP2pWfdInfo.DEVICE_TYPE_SOURCE_OR_PRIMARY_SINK
                         isSessionAvailable = true
                     }
-                    manager?.setWfdInfo(mChannel!!,wfdInfo,object :WifiP2pManager.ActionListener{
-                        override fun onSuccess() {
-                            LogUtils.i("Miracast中发现成功..")
-                        }
+                    manager?.setWfdInfo(
+                        mChannel!!,
+                        wfdInfo,
+                        object : WifiP2pManager.ActionListener {
+                            override fun onSuccess() {
+                                LogUtils.i("Miracast中发现成功..")
+                            }
 
-                        override fun onFailure(reason: Int) {
-                            LogUtils.e("Miracast中发现失败..$reason")
-                        }
+                            override fun onFailure(reason: Int) {
+                                LogUtils.e("Miracast中发现失败..$reason")
+                            }
 
-                    })
+                        })
                 }
             }
         }
@@ -372,7 +527,7 @@ class MainActivity : BaseVMActivity<WifiP2pViewModel>(WifiP2pViewModel::class.ja
             WifiP2pViewModel.ConnectState.CONNECT_SUCCESS -> {
                 LogUtils.i("连接成功...")
                 navController.navigate(MESSAGE_FRAGMENT)
-                manager.discoverPeers(mChannel,object :WifiP2pManager.ActionListener{
+                manager.discoverPeers(mChannel, object : WifiP2pManager.ActionListener {
                     override fun onSuccess() {
                         LogUtils.i("开始搜索成功。。。。")
                     }

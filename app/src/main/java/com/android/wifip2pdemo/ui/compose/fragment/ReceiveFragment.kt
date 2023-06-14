@@ -132,6 +132,7 @@ object ReceiveFragment {
                                     val p2pInfo = P2pInfo(
                                         netWorkName.value, pin.value
                                     )
+
                                     viewModel.createNewGroup(p2pInfo)
                                     isCreate.value = false
 

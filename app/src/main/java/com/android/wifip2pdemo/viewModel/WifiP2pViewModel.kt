@@ -21,6 +21,7 @@ import com.android.wifip2pdemo.ui.compose.fragment.Constants.PIN
 import com.android.wifip2pdemo.ui.compose.fragment.ReceiveFragment
 import com.android.wifip2pdemo.utils.MediaUtils
 import com.android.wifip2pdemo.viewModel.WifiP2pViewModel.ConnectState.*
+import com.blankj.utilcode.util.DeviceUtils
 import com.blankj.utilcode.util.FileUtils
 import com.blankj.utilcode.util.LogUtils
 import com.blankj.utilcode.util.PathUtils
@@ -175,8 +176,10 @@ class WifiP2pViewModel(
             val wifiP2pConfig = WifiP2pConfig.Builder()
                 .setNetworkName(info.netWorkName)
                 .setPassphrase(info.pin)
-                .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
+//                .setGroupOperatingFrequency()
                 .build()
+
+            wifiP2pConfig.wps.BSSID=DeviceUtils.getMacAddress()
 
 
 
